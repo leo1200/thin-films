@@ -24,15 +24,15 @@ def transfer_matrix_method(
     wavelength: float,
     polar_angle: float,
     azimuthal_angle: float,
-    pte: float,
-    ptm: float,
+    transverse_electric_component: float,
+    transverse_magnetic_component: float,
     permeability_reflection: float,
     permittivity_reflection: float,
     permeability_transmission: float,
     permittivity_transmission: float,
-    transmission_mode: int,
-    layer_permeabilities: Float[Array, "num_layers"],
-    layer_permittivities: Float[Array, "num_layers"],
+    backside_mode: int,
+    permeability_layers: Float[Array, "num_layers"],
+    permittivity_layers: Float[Array, "num_layers"],
     layer_thicknesses: Float[Array, "num_layers"]
 ) -> Tuple[float, float, float]:
     """
@@ -42,16 +42,17 @@ def transfer_matrix_method(
         wavelength: Free-space wavelength.
         polar_angle: Polar/zenith angle in radians.
         azimuthal_angle: Azimuthal angle in radians.
-        pte: TE polarized component.
-        ptm: TM polarized component.
-        ur1: Relative permeability (reflection side).
-        er1: Relative permittivity (reflection side).
-        ur2: Relative permeability (transmission side).
-        er2: Relative permittivity (transmission side).
-        trn0: Decision variable for backside transmission/reflection (-1, 0, or 1).
-        UR: Relative permeabilities of layers.
-        ER: Relative permittivities of layers.
-        L: Thicknesses of layers.
+        transverse_electric_component: TE polarized component.
+        transverse_magnetic_component: TM polarized component.
+        permeability_reflection: Relative permeability (reflection side).
+        permittivity_reflection: Relative permittivity (reflection side).
+        permeability_transmission: Relative permeability (transmission side).
+        permittivity_transmission: Relative permittivity (transmission side).
+        backside_mode: Decision variable for backside transmission/reflection
+                       (-1: reflection with phase inversion, 0: reflection, 1: transmission)
+        layer_permeabilities: Relative permeabilities of layers.
+        layer_permittivities: Relative permittivities of layers.
+        layer_thicknesses: Thicknesses of layers.
 
     Returns:
         Tuple[float, float, float]: Reflectance (REF), Transmittance (TRN), Conservation (CON).
@@ -88,7 +89,7 @@ def transfer_matrix_method(
     )
 
     # Combine parameters for each layer
-    layer_params = jnp.stack([layer_permeabilities, layer_permittivities, layer_thicknesses], axis=-1)
+    layer_params = jnp.stack([permeability_layers, permittivity_layers, layer_thicknesses], axis=-1)
     
     def compute_layer(SG, params):
         """
@@ -140,7 +141,7 @@ def transfer_matrix_method(
     )
 
     # Backside transmission/reflection
-    if transmission_mode == 1:
+    if backside_mode == 1:
         Q = (1 / permeability_transmission) * jnp.array([[kx * ky, permeability_transmission * permittivity_transmission - kx**2],
                                    [ky**2 - permeability_transmission * permittivity_transmission, -kx * ky]])
         OMEGA = 1j * kztrn * identity22
@@ -154,14 +155,14 @@ def transfer_matrix_method(
             S21 = 2 * inverse22(A),
             S22 = -inverse22(A) @ B
         )
-    elif transmission_mode == 0:
+    elif backside_mode == 0:
         ST = getQuadBlock(
             S11 = identity22,
             S12 = zeros22,
             S21 = zeros22,
             S22 = identity22
         )
-    elif transmission_mode == -1:
+    elif backside_mode == -1:
         ST = getQuadBlock(
             S11 = identity22,
             S12 = zeros22,
@@ -190,7 +191,7 @@ def transfer_matrix_method(
     atm = jnp.cross(ate, kinc)
     atm /= jnp.linalg.norm(atm)
     
-    P = pte * ate + ptm * atm
+    P = transverse_electric_component * ate + transverse_magnetic_component * atm
     P /= jnp.linalg.norm(P)
 
     # Reflected and transmitted fields
