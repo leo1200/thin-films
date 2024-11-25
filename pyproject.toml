@@ -8,7 +8,6 @@ packages = [{include = "reflax"}]
 
 [tool.poetry.dependencies]
 python = ">=3.9"
-optax = ">=0.2.0"
 jax = ">=0.4.0"
 jaxtyping = ">=0.2.0"
 
