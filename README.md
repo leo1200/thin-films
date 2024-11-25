@@ -1,0 +1,1 @@
+!pip install git+https://leo1200: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@github.com/leo1200/thin-films.git#v0.0.2

@@ -21,27 +21,27 @@ from reflax._matrix_operations import (
 
 @partial(jax.jit, static_argnames=['trn0'])
 def transfer_matrix_method(
-    lam0: float,
-    theta: float,
-    phi: float,
+    wavelength: float,
+    polar_angle: float,
+    azimuthal_angle: float,
     pte: float,
     ptm: float,
-    ur1: float,
-    er1: float,
-    ur2: float,
-    er2: float,
-    trn0: int,
-    UR: Float[Array, "num_layers"],
-    ER: Float[Array, "num_layers"],
-    L: Float[Array, "num_layers"]
+    permeability_reflection: float,
+    permittivity_reflection: float,
+    permeability_transmission: float,
+    permittivity_transmission: float,
+    transmission_mode: int,
+    layer_permeabilities: Float[Array, "num_layers"],
+    layer_permittivities: Float[Array, "num_layers"],
+    layer_thicknesses: Float[Array, "num_layers"]
 ) -> Tuple[float, float, float]:
     """
     Transfer Matrix Method for 1D Optical Structures.
 
     Args:
-        lam0: Free-space wavelength.
-        theta: Polar/zenith angle in radians.
-        phi: Azimuthal angle in radians.
+        wavelength: Free-space wavelength.
+        polar_angle: Polar/zenith angle in radians.
+        azimuthal_angle: Azimuthal angle in radians.
         pte: TE polarized component.
         ptm: TM polarized component.
         ur1: Relative permeability (reflection side).
@@ -56,24 +56,24 @@ def transfer_matrix_method(
     Returns:
         Tuple[float, float, float]: Reflectance (REF), Transmittance (TRN), Conservation (CON).
     """
-    I = jnp.eye(2, dtype=jnp.complex64)
-    Z = jnp.zeros((2, 2), dtype=jnp.complex64)
+    identity22 = jnp.eye(2, dtype=jnp.complex64)
+    zeros22 = jnp.zeros((2, 2), dtype=jnp.complex64)
 
     # Refractive indices of external regions
-    nref = jnp.sqrt(ur1 * er1)
-    ntrn = jnp.sqrt(ur2 * er2)
+    nref = jnp.sqrt(permeability_reflection * permittivity_reflection)
+    ntrn = jnp.sqrt(permeability_transmission * permittivity_transmission)
 
     # Calculate wave vector components
-    k0 = 2 * jnp.pi / lam0
+    k0 = 2 * jnp.pi / wavelength
     # Compute normalized wavevector
-    kinc = nref * jnp.array([jnp.sin(theta) * jnp.cos(phi), jnp.sin(theta) * jnp.sin(phi), jnp.cos(theta)])
+    kinc = nref * jnp.array([jnp.sin(polar_angle) * jnp.cos(azimuthal_angle), jnp.sin(polar_angle) * jnp.sin(azimuthal_angle), jnp.cos(polar_angle)])
 
     # Extract components
     kx, ky = kinc[0], kinc[1]
 
     # Calculate z-component of wave vector in reflection region
-    kzref = jnp.sqrt(ur1 * er1 - kx**2 - ky**2)
-    kztrn = jnp.sqrt(ur2 * er2 - kx**2 - ky**2)
+    kzref = jnp.sqrt(permeability_reflection * permittivity_reflection - kx**2 - ky**2)
+    kztrn = jnp.sqrt(permeability_transmission * permittivity_transmission - kx**2 - ky**2)
 
     # Eigen-modes in the gap medium
     Q = jnp.array([[kx * ky, 1 + ky**2], [-1 - kx**2, -kx * ky]])
@@ -81,14 +81,14 @@ def transfer_matrix_method(
 
     # Initialize global scattering matrix
     SG = getQuadBlock(
-        S11 = Z,
-        S12 = I,
-        S21 = I,
-        S22 = Z
+        S11 = zeros22,
+        S12 = identity22,
+        S21 = identity22,
+        S22 = zeros22
     )
 
     # Combine parameters for each layer
-    layer_params = jnp.stack([UR, ER, L], axis=-1)
+    layer_params = jnp.stack([layer_permeabilities, layer_permittivities, layer_thicknesses], axis=-1)
     
     def compute_layer(SG, params):
         """
@@ -99,13 +99,13 @@ def transfer_matrix_method(
         Q = (1 / ur) * jnp.array([[kx * ky, ur * er - kx**2],
                                   [ky**2 - ur * er, -kx * ky]])
         kz = jnp.sqrt(ur * er - kx**2 - ky**2)
-        OMEGA = 1j * kz * I
+        OMEGA = 1j * kz * identity22
         V = Q @ inverse22(OMEGA)
         X = jnp.diag(jnp.exp(jnp.diag(OMEGA) * k0 * l))
         
         # Layer scattering matrix
-        A = I + inverse22(V) @ Vg
-        B = I - inverse22(V) @ Vg
+        A = identity22 + inverse22(V) @ Vg
+        B = identity22 - inverse22(V) @ Vg
         D = A - X @ B @ inverse22(A) @ X @ B
         
         S = initQuadBlock()
@@ -123,14 +123,14 @@ def transfer_matrix_method(
     SG, _ = jax.lax.scan(compute_layer, SG, layer_params)
 
     # Reflection region eigen-modes
-    Q = (1 / ur1) * jnp.array([[kx * ky, ur1 * er1 - kx**2],
-                               [ky**2 - ur1 * er1, -kx * ky]])
-    OMEGA = 1j * kzref * I
+    Q = (1 / permeability_reflection) * jnp.array([[kx * ky, permeability_reflection * permittivity_reflection - kx**2],
+                               [ky**2 - permeability_reflection * permittivity_reflection, -kx * ky]])
+    OMEGA = 1j * kzref * identity22
     Vref = Q @ inverse22(OMEGA)
 
     # Reflection-side scattering matrix
-    A = I + inverse22(Vg) @ Vref
-    B = I - inverse22(Vg) @ Vref
+    A = identity22 + inverse22(Vg) @ Vref
+    B = identity22 - inverse22(Vg) @ Vref
 
     SR = getQuadBlock(
         S11 = -inverse22(A) @ B,
@@ -140,13 +140,13 @@ def transfer_matrix_method(
     )
 
     # Backside transmission/reflection
-    if trn0 == 1:
-        Q = (1 / ur2) * jnp.array([[kx * ky, ur2 * er2 - kx**2],
-                                   [ky**2 - ur2 * er2, -kx * ky]])
-        OMEGA = 1j * kztrn * I
+    if transmission_mode == 1:
+        Q = (1 / permeability_transmission) * jnp.array([[kx * ky, permeability_transmission * permittivity_transmission - kx**2],
+                                   [ky**2 - permeability_transmission * permittivity_transmission, -kx * ky]])
+        OMEGA = 1j * kztrn * identity22
         Vtrn = Q @ inverse22(OMEGA)
-        A = I + inverse22(Vg) @ Vtrn
-        B = I - inverse22(Vg) @ Vtrn
+        A = identity22 + inverse22(Vg) @ Vtrn
+        B = identity22 - inverse22(Vg) @ Vtrn
 
         ST = getQuadBlock(
             S11 = B @ inverse22(A),
@@ -154,19 +154,19 @@ def transfer_matrix_method(
             S21 = 2 * inverse22(A),
             S22 = -inverse22(A) @ B
         )
-    elif trn0 == 0:
+    elif transmission_mode == 0:
         ST = getQuadBlock(
-            S11 = I,
-            S12 = Z,
-            S21 = Z,
-            S22 = I
+            S11 = identity22,
+            S12 = zeros22,
+            S21 = zeros22,
+            S22 = identity22
         )
-    elif trn0 == -1:
+    elif transmission_mode == -1:
         ST = getQuadBlock(
-            S11 = I,
-            S12 = Z,
-            S21 = Z,
-            S22 = -I
+            S11 = identity22,
+            S12 = zeros22,
+            S21 = zeros22,
+            S22 = -identity22
         )
 
     # Connect global scattering matrix to external regions
@@ -185,7 +185,7 @@ def transfer_matrix_method(
         return jnp.cross(n, kinc) / jnp.linalg.norm(jnp.cross(n, kinc))
 
     # Use lax.cond to choose between the two branches
-    ate = lax.cond(abs(theta) < 1e-6, branch_zero, branch_nonzero)
+    ate = lax.cond(abs(polar_angle) < 1e-6, branch_zero, branch_nonzero)
 
     atm = jnp.cross(ate, kinc)
     atm /= jnp.linalg.norm(atm)
@@ -207,7 +207,7 @@ def transfer_matrix_method(
     
     # Calculate reflectance and transmittance
     REF = jnp.linalg.norm(Eref)**2
-    TRN = jnp.linalg.norm(Etrn)**2 * jnp.real(ur1 / ur2 * kztrn / kzref)
+    TRN = jnp.linalg.norm(Etrn)**2 * jnp.real(permeability_reflection / permeability_transmission * kztrn / kzref)
     CON = REF + TRN
 
     return REF, TRN, CON
