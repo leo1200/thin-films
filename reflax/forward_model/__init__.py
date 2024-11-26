@@ -1,1 +1,1 @@
-from reflax.forward_model.one_growing_layer import one_growing_layer
+from reflax.forward_model.variable_layer_size import variable_layer_thickness_simulation

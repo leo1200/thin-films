@@ -19,7 +19,7 @@ from reflax._matrix_operations import (
     setS12
 )
 
-@partial(jax.jit, static_argnames=['trn0'])
+@partial(jax.jit, static_argnames=['backside_mode'])
 def transfer_matrix_method(
     wavelength: float,
     polar_angle: float,

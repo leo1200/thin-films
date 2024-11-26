@@ -1,3 +1,3 @@
 from reflax.transfer_matrix_method import transfer_matrix_method
-from reflax.forward_model import one_growing_layer
+from reflax.forward_model import variable_layer_thickness_simulation
 from reflax.helpers import polanalyze
