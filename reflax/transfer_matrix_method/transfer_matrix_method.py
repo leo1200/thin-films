@@ -55,7 +55,7 @@ def transfer_matrix_method(
         layer_thicknesses: Thicknesses of layers.
 
     Returns:
-        Tuple[float, float, float]: Reflectance (REF), Transmittance (TRN), Conservation (CON).
+        Reflectance (REF), Transmittance (TRN), Conservation (CON).
     """
     identity22 = jnp.eye(2, dtype=jnp.complex64)
     zeros22 = jnp.zeros((2, 2), dtype=jnp.complex64)
