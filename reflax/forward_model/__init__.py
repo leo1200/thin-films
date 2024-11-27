@@ -1,1 +1,1 @@
-from reflax.forward_model.variable_layer_size import variable_layer_thickness_simulation
+from reflax.forward_model.variable_layer_size import variable_layer_thickness_simulation, power_forward_model, power_forward_residuals

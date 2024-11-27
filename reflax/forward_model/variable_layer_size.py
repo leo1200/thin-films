@@ -83,3 +83,112 @@ def variable_layer_thickness_simulation(
     )(thickness_matrix)
     
     return reflection_coefficients, transmission_coefficients, conservation_checks
+
+@partial(jax.jit, static_argnames=['backside_mode'])
+def power_forward_model(
+    wavelength: float,
+    polar_angle: float,
+    azimuthal_angle: float,
+    transverse_electric_component: float,
+    transverse_magnetic_component: float,
+    permeability_reflection: float,
+    permittivity_reflection: float,
+    permeability_transmission: float,
+    permittivity_transmission: float,
+    backside_mode: int,
+    permeability_static_size_layers: Float[Array, "num_layers"],
+    permittivity_static_size_layers: Float[Array, "num_layers"],
+    static_layer_thicknesses: Float[Array, "num_layers"],
+    permeability_variable_layer: float,
+    permittivity_variable_layer: float,
+    timepoints_measured: Float[Array, "num_timepoints"],
+    initial_thickness: float,
+    growth_velocity: float,
+    growth_acceleration: float,
+    power_conversion_factor: float,
+    power_consversion_constant: float
+) -> Tuple[Float[Array, "num_timepoints"], Float[Array, "num_timepoints"], Float[Array, "num_timepoints"]]:
+    """
+    TODO: write docstring
+    """
+    
+    variable_layer_thicknesses = initial_thickness + growth_velocity * timepoints_measured + growth_acceleration * timepoints_measured ** 2
+
+    reflection_coefficients, _, _ = variable_layer_thickness_simulation(
+                                        wavelength,
+                                        polar_angle,
+                                        azimuthal_angle,
+                                        transverse_electric_component,
+                                        transverse_magnetic_component,
+                                        permeability_reflection,
+                                        permittivity_reflection,
+                                        permeability_transmission,
+                                        permittivity_transmission,
+                                        backside_mode,
+                                        permeability_static_size_layers,
+                                        permittivity_static_size_layers,
+                                        static_layer_thicknesses,
+                                        permeability_variable_layer,
+                                        permittivity_variable_layer,
+                                        variable_layer_thicknesses
+                                    ) 
+    
+    power_output = power_consversion_constant + power_conversion_factor * reflection_coefficients
+
+    return power_output
+
+
+@partial(jax.jit, static_argnames=['backside_mode'])
+def power_forward_residuals(
+    wavelength: float,
+    polar_angle: float,
+    azimuthal_angle: float,
+    transverse_electric_component: float,
+    transverse_magnetic_component: float,
+    permeability_reflection: float,
+    permittivity_reflection: float,
+    permeability_transmission: float,
+    permittivity_transmission: float,
+    backside_mode: int,
+    permeability_static_size_layers: Float[Array, "num_layers"],
+    permittivity_static_size_layers: Float[Array, "num_layers"],
+    static_layer_thicknesses: Float[Array, "num_layers"],
+    permeability_variable_layer: float,
+    permittivity_variable_layer: float,
+    timepoints_measured: Float[Array, "num_timepoints"],
+    power_measured: Float[Array, "num_timepoints"],
+    initial_thickness: float,
+    growth_velocity: float,
+    growth_acceleration: float,
+    power_conversion_factor: float,
+    power_consversion_constant: float
+) -> Tuple[Float[Array, "num_timepoints"], Float[Array, "num_timepoints"], Float[Array, "num_timepoints"]]:
+    """
+    TODO: write docstring
+    """
+    
+    power_modeled = power_forward_model(
+                        wavelength,
+                        polar_angle,
+                        azimuthal_angle,
+                        transverse_electric_component,
+                        transverse_magnetic_component,
+                        permeability_reflection,
+                        permittivity_reflection,
+                        permeability_transmission,
+                        permittivity_transmission,
+                        backside_mode,
+                        permeability_static_size_layers,
+                        permittivity_static_size_layers,
+                        static_layer_thicknesses,
+                        permeability_variable_layer,
+                        permittivity_variable_layer,
+                        timepoints_measured,
+                        initial_thickness,
+                        growth_velocity,
+                        growth_acceleration,
+                        power_conversion_factor,
+                        power_consversion_constant
+                    )
+    
+    return power_modeled - power_measured
