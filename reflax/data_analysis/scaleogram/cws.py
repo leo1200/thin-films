@@ -6,7 +6,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.colors import LogNorm
 
-from reflax.scaleogram.wfun import get_default_wavelet, WAVLIST, fastcwt
+from reflax.data_analysis.scaleogram.wfun import get_default_wavelet, WAVLIST, fastcwt
 
 CBAR_DEFAULTS = {
     'vertical'   : { 'aspect':30, 'pad':0.03, 'fraction':0.05 },

@@ -1,3 +1,4 @@
 from reflax.transfer_matrix_method import transfer_matrix_method
 from reflax.forward_model import variable_layer_thickness_simulation, power_forward_model, power_forward_residuals
-from reflax.helpers import polanalyze
+from reflax._helpers import polanalyze
+from reflax.parameter_classes import SetupParams, OpticsParams, LayerParams

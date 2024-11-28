@@ -18,41 +18,24 @@ from reflax._matrix_operations import (
     setS11,
     setS12
 )
+from reflax.parameter_classes.parameters import LayerParams, OpticsParams, SetupParams
 
 @partial(jax.jit, static_argnames=['backside_mode'])
 def transfer_matrix_method(
-    wavelength: float,
-    polar_angle: float,
-    azimuthal_angle: float,
-    transverse_electric_component: float,
-    transverse_magnetic_component: float,
-    permeability_reflection: float,
-    permittivity_reflection: float,
-    permeability_transmission: float,
-    permittivity_transmission: float,
-    backside_mode: int,
-    permeability_layers: Float[Array, "num_layers"],
-    permittivity_layers: Float[Array, "num_layers"],
-    layer_thicknesses: Float[Array, "num_layers"]
+    setup_params: SetupParams,
+    optics_params: OpticsParams,
+    layer_params: LayerParams,
+    backside_mode: int
 ) -> Tuple[float, float, float]:
     """
     Transfer Matrix Method for 1D Optical Structures.
 
     Args:
-        wavelength: Free-space wavelength.
-        polar_angle: Polar/zenith angle in radians.
-        azimuthal_angle: Azimuthal angle in radians.
-        transverse_electric_component: TE polarized component.
-        transverse_magnetic_component: TM polarized component.
-        permeability_reflection: Relative permeability (reflection side).
-        permittivity_reflection: Relative permittivity (reflection side).
-        permeability_transmission: Relative permeability (transmission side).
-        permittivity_transmission: Relative permittivity (transmission side).
+        setup_params: Parameters of the setup.
+        optics_params: Parameters of the optics.
+        layer_params: Parameters of the layers.
         backside_mode: Decision variable for backside transmission/reflection
                        (-1: reflection with phase inversion, 0: reflection, 1: transmission)
-        layer_permeabilities: Relative permeabilities of layers.
-        layer_permittivities: Relative permittivities of layers.
-        layer_thicknesses: Thicknesses of layers.
 
     Returns:
         Reflectance (REF), Transmittance (TRN), Conservation (CON).
@@ -61,20 +44,20 @@ def transfer_matrix_method(
     zeros22 = jnp.zeros((2, 2), dtype=jnp.complex64)
 
     # Refractive indices of external regions
-    nref = jnp.sqrt(permeability_reflection * permittivity_reflection)
-    ntrn = jnp.sqrt(permeability_transmission * permittivity_transmission)
+    nref = jnp.sqrt(optics_params.permeability_reflection * optics_params.permittivity_reflection)
+    ntrn = jnp.sqrt(optics_params.permeability_transmission * optics_params.permittivity_transmission)
 
     # Calculate wave vector components
-    k0 = 2 * jnp.pi / wavelength
+    k0 = 2 * jnp.pi / setup_params.wavelength
     # Compute normalized wavevector
-    kinc = nref * jnp.array([jnp.sin(polar_angle) * jnp.cos(azimuthal_angle), jnp.sin(polar_angle) * jnp.sin(azimuthal_angle), jnp.cos(polar_angle)])
+    kinc = nref * jnp.array([jnp.sin(setup_params.polar_angle) * jnp.cos(setup_params.azimuthal_angle), jnp.sin(setup_params.polar_angle) * jnp.sin(setup_params.azimuthal_angle), jnp.cos(setup_params.polar_angle)])
 
     # Extract components
     kx, ky = kinc[0], kinc[1]
 
     # Calculate z-component of wave vector in reflection region
-    kzref = jnp.sqrt(permeability_reflection * permittivity_reflection - kx**2 - ky**2)
-    kztrn = jnp.sqrt(permeability_transmission * permittivity_transmission - kx**2 - ky**2)
+    kzref = jnp.sqrt(optics_params.permeability_reflection * optics_params.permittivity_reflection - kx**2 - ky**2)
+    kztrn = jnp.sqrt(optics_params.permeability_transmission * optics_params.permittivity_transmission - kx**2 - ky**2)
 
     # Eigen-modes in the gap medium
     Q = jnp.array([[kx * ky, 1 + ky**2], [-1 - kx**2, -kx * ky]])
@@ -89,7 +72,7 @@ def transfer_matrix_method(
     )
 
     # Combine parameters for each layer
-    layer_params = jnp.stack([permeability_layers, permittivity_layers, layer_thicknesses], axis=-1)
+    layer_params = jnp.stack([layer_params.permeabilities, layer_params.permittivities, layer_params.thicknesses], axis=-1)
     
     def compute_layer(SG, params):
         """
@@ -124,8 +107,8 @@ def transfer_matrix_method(
     SG, _ = jax.lax.scan(compute_layer, SG, layer_params)
 
     # Reflection region eigen-modes
-    Q = (1 / permeability_reflection) * jnp.array([[kx * ky, permeability_reflection * permittivity_reflection - kx**2],
-                               [ky**2 - permeability_reflection * permittivity_reflection, -kx * ky]])
+    Q = (1 / optics_params.permeability_reflection) * jnp.array([[kx * ky, optics_params.permeability_reflection * optics_params.permittivity_reflection - kx**2],
+                               [ky**2 - optics_params.permeability_reflection * optics_params.permittivity_reflection, -kx * ky]])
     OMEGA = 1j * kzref * identity22
     Vref = Q @ inverse22(OMEGA)
 
@@ -142,8 +125,8 @@ def transfer_matrix_method(
 
     # Backside transmission/reflection
     if backside_mode == 1:
-        Q = (1 / permeability_transmission) * jnp.array([[kx * ky, permeability_transmission * permittivity_transmission - kx**2],
-                                   [ky**2 - permeability_transmission * permittivity_transmission, -kx * ky]])
+        Q = (1 / optics_params.permeability_transmission) * jnp.array([[kx * ky, optics_params.permeability_transmission * optics_params.permittivity_transmission - kx**2],
+                                   [ky**2 - optics_params.permeability_transmission * optics_params.permittivity_transmission, -kx * ky]])
         OMEGA = 1j * kztrn * identity22
         Vtrn = Q @ inverse22(OMEGA)
         A = identity22 + inverse22(Vg) @ Vtrn
@@ -186,12 +169,12 @@ def transfer_matrix_method(
         return jnp.cross(n, kinc) / jnp.linalg.norm(jnp.cross(n, kinc))
 
     # Use lax.cond to choose between the two branches
-    ate = lax.cond(abs(polar_angle) < 1e-6, branch_zero, branch_nonzero)
+    ate = lax.cond(abs(setup_params.polar_angle) < 1e-6, branch_zero, branch_nonzero)
 
     atm = jnp.cross(ate, kinc)
     atm /= jnp.linalg.norm(atm)
     
-    P = transverse_electric_component * ate + transverse_magnetic_component * atm
+    P = optics_params.transverse_electric_component * ate + optics_params.transverse_magnetic_component * atm
     P /= jnp.linalg.norm(P)
 
     # Reflected and transmitted fields
@@ -208,7 +191,7 @@ def transfer_matrix_method(
     
     # Calculate reflectance and transmittance
     REF = jnp.linalg.norm(Eref)**2
-    TRN = jnp.linalg.norm(Etrn)**2 * jnp.real(permeability_reflection / permeability_transmission * kztrn / kzref)
+    TRN = jnp.linalg.norm(Etrn)**2 * jnp.real(optics_params.permeability_reflection / optics_params.permeability_transmission * kztrn / kzref)
     CON = REF + TRN
 
     return REF, TRN, CON
