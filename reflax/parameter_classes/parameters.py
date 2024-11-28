@@ -6,7 +6,6 @@ import jax.numpy as jnp
 
 from typing import NamedTuple
 
-
 # pytree-objects via eqx.Module
 import equinox as eqx
 
