@@ -2,10 +2,12 @@ from functools import partial
 import jax
 import jax.numpy as jnp
 from reflax.parameter_classes.parameters import GrowthModel, LayerParams, OpticsParams, SetupParams
-from reflax.transfer_matrix_method import transfer_matrix_method
+from reflax.reflactance_models import transfer_matrix_method
 from jaxtyping import Array, Float
 from functools import partial
 from typing import Tuple
+
+from reflax.reflactance_models.baseline_methods import one_layer_internal_reflections, one_layer_no_internal_reflections
 
 @partial(jax.jit, static_argnames=['backside_mode'])
 def variable_layer_thickness_simulation(
@@ -90,6 +92,57 @@ def power_forward_model(
     power_output = power_conversion_constant + power_conversion_factor * reflection_coefficients
 
     return power_output
+
+
+ONE_LAYER_NO_INTERNAL_REFLECTIONS = 0
+ONE_LAYER_INTERNAL_REFLECTIONS = 1
+TRANSFER_MATRIX_METHOD = 2
+
+
+@partial(jax.jit, static_argnames=['backside_mode', 'model'])
+def normalized_forward_model(
+    model: int,
+    setup_params: SetupParams,
+    optics_params: OpticsParams,
+    static_layer_params: LayerParams,
+    variable_layer_params: LayerParams,
+    timepoints_measured: Float[Array, "num_timepoints"],
+    growth_model: GrowthModel,
+    backside_mode: int
+) -> Tuple[Float[Array, "num_timepoints"], Float[Array, "num_timepoints"], Float[Array, "num_timepoints"]]:
+    """
+    TODO: write docstring
+    """
+    
+    variable_layer_thicknesses = growth_model.initial_thickness + growth_model.growth_velocity * timepoints_measured + 0.5 * growth_model.growth_acceleration * timepoints_measured ** 2
+
+    if model == ONE_LAYER_NO_INTERNAL_REFLECTIONS:
+        variable_layer_params = variable_layer_params._replace(thicknesses = variable_layer_thicknesses)
+        out = one_layer_no_internal_reflections(
+            setup_params = setup_params,
+            optics_params = optics_params,
+            layer_params = variable_layer_params
+        )
+    elif model == ONE_LAYER_INTERNAL_REFLECTIONS:
+        variable_layer_params = variable_layer_params._replace(thicknesses = variable_layer_thicknesses)
+        out = one_layer_internal_reflections(
+            setup_params = setup_params,
+            optics_params = optics_params,
+            layer_params = variable_layer_params
+        )
+    elif model == TRANSFER_MATRIX_METHOD:
+        out, _, _ = variable_layer_thickness_simulation(
+                                    setup_params = setup_params,
+                                    optics_params = optics_params,
+                                    static_layer_params = static_layer_params,
+                                    variable_layer_params = variable_layer_params,
+                                    variable_layer_thicknesses = variable_layer_thicknesses,
+                                    backside_mode = backside_mode
+                                ) 
+    else:
+        raise ValueError("Invalid model choice")
+
+    return (out - jnp.mean(out)) / jnp.std(out)
 
 
 @partial(jax.jit, static_argnames=['backside_mode'])

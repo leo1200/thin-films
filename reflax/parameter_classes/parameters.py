@@ -27,6 +27,9 @@ class SetupParams(NamedTuple):
     #: Azimuthal angle in radians.
     azimuthal_angle: FloatScalar = jnp.deg2rad(0)
 
+    #: Polarization state.
+    polstate: str = "Linear TE/perpendicular/s";
+
 class OpticsParams(NamedTuple):
     """
     TODO: write class description

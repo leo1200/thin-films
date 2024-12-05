@@ -1,6 +1,7 @@
 # Introduction and Installation
 
-`reflax` is TODO written in `JAX`.
+`reflax` is a toolbox for forward-modeling and inference for interference on
+growing thin films in a multi-layer setup written in `JAX`.
 
 
 ::::{grid} 1 2 2 3
@@ -14,17 +15,22 @@ Written in `JAX`, `reflax` is fully differentiable - a simulation can be differe
 [Learn more »](notebooks/one_growing_layer.ipynb)
 :::
 
-:::{grid-item-card} {octicon}`shield-check;1.5em;sd-mr-1` blablablab
+:::{grid-item-card} {octicon}`shield-check;1.5em;sd-mr-1` All-in-one solution
 
-Blablabla
+`reflax` includes all the inference tools necessary to calibrate optical parameters
+and infer growth behavior from experimental data. Based on the differentiability of the
+forward models implemented, [Levenberg Marquardt](https://en.wikipedia.org/wiki/Levenberg%E2%80%93Marquardt_algorithm) can be employed for optimization.
 
 +++
 [Learn more »](notebooks/one_growing_layer.ipynb)
 :::
 
-:::{grid-item-card} {octicon}`tools;1.5em;sd-mr-1` akshdfoiasdhfiahsd
+:::{grid-item-card} {octicon}`tools;1.5em;sd-mr-1` Easily Adaptable
 
-blablabla
+You want to infere based on the reflectance signal of multiple LASERs? You want to
+train a machine learning model to predict the growth rate based on environmental
+parameters? - adapting the loss or training a machine learning model inside `reflax`
+is straightforward.
 
 +++
 [Learn more »](notebooks/one_growing_layer.ipynb)
@@ -50,7 +56,9 @@ as a dependency. For a GPU-compatible installation of `JAX`, please refer to the
 
 ## Roadmap
 
-- [x] Implement in `JAX`.
+- [x] implement in `JAX`
+- [ ] detailed model comparison
+- [ ] train an SBI pipeline, e.g. a `simformer`
 
 
 ```{toctree}
