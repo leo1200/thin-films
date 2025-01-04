@@ -204,13 +204,6 @@ def multiple_layers_internal_reflections(
             2, layer_idx + 1, inner_loop_update, intermediate_product
         )
 
-        # convert to JAX if/else, so jax.lax.cond
-        # if j == 2
-        #     intermediate_product = intermediate_product ./ (1 - topside_reflection_coefficient .* backside_reflection_coefficient .* exp(2i .* delta));
-        # else
-        #     intermediate_product = intermediate_product ./ (1 - topside_reflection_coefficient .* backside_reflection_coefficient .* exp(2i .* delta_array(j-2)));
-        # end
-
         def internal_reflection_update(intermediate_product):
             return intermediate_product / (1 - topside_reflection * backside_reflection * jnp.exp(2j * delta))
         
@@ -218,7 +211,7 @@ def multiple_layers_internal_reflections(
             return intermediate_product / (1 - topside_reflection * backside_reflection * jnp.exp(2j * delta_array[layer_idx - 2]))
         
         intermediate_product = lax.cond(
-            layer_idx == 2,
+            layer_idx == 1,
             internal_reflection_update,
             internal_reflection_update2,
             intermediate_product
