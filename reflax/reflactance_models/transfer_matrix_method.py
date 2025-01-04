@@ -40,8 +40,9 @@ def transfer_matrix_method(
     Returns:
         Reflectance (REF), Transmittance (TRN), Conservation (CON).
     """
-    identity22 = jnp.eye(2, dtype=jnp.complex64)
-    zeros22 = jnp.zeros((2, 2), dtype=jnp.complex64)
+    type = jnp.complex128 if jax.config.jax_enable_x64 else jnp.complex64
+    identity22 = jnp.eye(2, dtype = type)
+    zeros22 = jnp.zeros((2, 2), dtype = type)
 
     # Refractive indices of external regions
     nref = jnp.sqrt(optics_params.permeability_reflection * optics_params.permittivity_reflection)
@@ -50,7 +51,7 @@ def transfer_matrix_method(
     # Calculate wave vector components
     k0 = 2 * jnp.pi / setup_params.wavelength
     # Compute normalized wavevector
-    kinc = nref * jnp.array([jnp.sin(setup_params.polar_angle) * jnp.cos(setup_params.azimuthal_angle), jnp.sin(setup_params.polar_angle) * jnp.sin(setup_params.azimuthal_angle), jnp.cos(setup_params.polar_angle)])
+    kinc = nref * jnp.array([jnp.sin(setup_params.polar_angle) * jnp.cos(setup_params.azimuthal_angle), jnp.sin(setup_params.polar_angle) * jnp.sin(setup_params.azimuthal_angle), jnp.cos(setup_params.polar_angle)], dtype = type)
 
     # Extract components
     kx, ky = kinc[0], kinc[1]
@@ -60,7 +61,7 @@ def transfer_matrix_method(
     kztrn = jnp.sqrt(optics_params.permeability_transmission * optics_params.permittivity_transmission - kx**2 - ky**2)
 
     # Eigen-modes in the gap medium
-    Q = jnp.array([[kx * ky, 1 + ky**2], [-1 - kx**2, -kx * ky]])
+    Q = jnp.array([[kx * ky, 1 + ky**2], [-1 - kx**2, -kx * ky]], dtype = type)
     Vg = -1j * Q
 
     # Initialize global scattering matrix
@@ -81,8 +82,8 @@ def transfer_matrix_method(
         ur, er, l = params  # Unpack layer-specific parameters
         
         Q = (1 / ur) * jnp.array([[kx * ky, ur * er - kx**2],
-                                  [ky**2 - ur * er, -kx * ky]])
-        kz = jnp.sqrt(ur * er - kx**2 - ky**2)
+                                  [ky**2 - ur * er, -kx * ky]], dtype = type)
+        kz = jnp.sqrt(ur * er - kx ** 2 - ky ** 2) # * jnp.sqrt(ur * er)
         OMEGA = 1j * kz * identity22
         V = Q @ inverse22(OMEGA)
         X = jnp.diag(jnp.exp(jnp.diag(OMEGA) * k0 * l))
@@ -108,7 +109,7 @@ def transfer_matrix_method(
 
     # Reflection region eigen-modes
     Q = (1 / optics_params.permeability_reflection) * jnp.array([[kx * ky, optics_params.permeability_reflection * optics_params.permittivity_reflection - kx**2],
-                               [ky**2 - optics_params.permeability_reflection * optics_params.permittivity_reflection, -kx * ky]])
+                               [ky**2 - optics_params.permeability_reflection * optics_params.permittivity_reflection, -kx * ky]], dtype = type)
     OMEGA = 1j * kzref * identity22
     Vref = Q @ inverse22(OMEGA)
 
@@ -162,7 +163,7 @@ def transfer_matrix_method(
 
     # Define the branch for abs(theta) < 1e-6
     def branch_zero():
-        return jnp.array([0.0, 1.0, 0.0])
+        return jnp.array([0.0, 1.0, 0.0], dtype = type)
 
     # Define the branch for abs(theta) >= 1e-6
     def branch_nonzero():
@@ -180,8 +181,8 @@ def transfer_matrix_method(
     # Reflected and transmitted fields
     Esrc = P[:2]
 
-    Eref = jnp.zeros((3,), dtype = jnp.complex64)
-    Etrn = jnp.zeros((3,), dtype = jnp.complex64)
+    Eref = jnp.zeros((3,), dtype = type)
+    Etrn = jnp.zeros((3,), dtype = type)
 
     Eref = Eref.at[:2].set(getS11(SG) @ Esrc)
     Etrn = Etrn.at[:2].set(getS21(SG) @ Esrc)

@@ -96,7 +96,8 @@ def getQuadBlock(
 
 @jax.jit
 def initQuadBlock() -> Float[Array, "4 4"]:
-    return jnp.zeros((4,4), dtype = jnp.complex64)
+    type = jnp.complex128 if jax.config.jax_enable_x64 else jnp.complex64
+    return jnp.zeros((4,4), dtype = type)
 
 # -------------------------------------------------------------
 # ====================== ↑ Constructors ↑ =====================

@@ -31,12 +31,16 @@ def calculate_ts(n, theta_incidence):
 def calculate_tp(n, theta_incidence):
     return (2 * n * jnp.cos(theta_incidence)) / (n**2 * jnp.cos(theta_incidence) + jnp.sqrt(n**2 - jnp.sin(theta_incidence)**2))
 
-@partial(jax.jit, static_argnames=['polstate'])
+LINEAR_TE_PERPENDICULAR_S = 0
+LINEAR_TM_PARALLEL_P = 1
+
+@jax.jit
 def calculate_reflection_coeff(n1, n2, theta_incidence, polstate):
     n = n2 / n1
-    if polstate.lower() == "linear te/perpendicular/s":
-        return calculate_rs(n, theta_incidence)
-    elif polstate.lower() == "linear tm/parallel/p":
-        return calculate_rp(n, theta_incidence)
-    else:
-        raise ValueError("Unsupported polarization state")
+    return calculate_rs(n, theta_incidence)
+    # if polstate == LINEAR_TE_PERPENDICULAR_S:
+    #     return calculate_rs(n, theta_incidence)
+    # elif polstate == LINEAR_TM_PARALLEL_P:
+    #     return calculate_rp(n, theta_incidence)
+    # else:
+    #     raise ValueError("Unsupported polarization state")

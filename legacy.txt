@@ -1,0 +1,47 @@
+
+# def residuals(params, consts):
+#     initial_thickness, growth_velocity, growth_acceleration, variable_layer_permittivity, power_conversion_factor, power_conversion_constant = params * initial_guess_x
+#     residuals = jnp.zeros((time_points_measured.shape[0] + 1,))
+
+#     residuals = residuals.at[:-1].set(power_forward_residuals(
+#         setup_params = setup_params,
+#         optics_params = optics_params,
+#         static_layer_params = static_layer_params,
+#         variable_layer_params = variable_layer_params._replace(permittivities = variable_layer_permittivity),
+#         timepoints_measured = time_points_measured,
+#         growth_model = growth_model._replace(initial_thickness = initial_thickness, growth_velocity = growth_velocity, growth_acceleration = growth_acceleration),
+#         power_conversion_factor = power_conversion_factor,
+#         power_conversion_constant = power_conversion_constant,
+#         backside_mode = backside_mode,
+#         power_measured = power_measured
+#     ))
+
+#     residuals = residuals.at[-1].set((initial_thickness + growth_velocity * time_points_measured[-1] + 1/2 * growth_acceleration * time_points_measured[-1] ** 2 - 771.83))
+
+#     return residuals
+
+# def swarm_least_squares_optimization(residuals, solver, initial_guess, variances, num_bees, random_key):
+#     random_normal_matrix = jax.random.normal(random_key, shape = ((initial_guess.shape[0], num_bees)))
+#     initial_condition_matrix = jnp.zeros((initial_guess.shape[0], num_bees + 1))
+#     initial_condition_matrix = initial_condition_matrix.at[:, :-1].set(initial_guess[:, None] + random_normal_matrix * jnp.sqrt(variances)[:, None])
+#     initial_condition_matrix = initial_condition_matrix.at[:, -1].set(initial_guess)
+
+#     # vmap optx.least_squares(residuals, solver, initial_guess).value over the bees
+#     def single_bee(guess):
+#         sol_arr = jnp.zeros((initial_guess.shape[0] + 1,))
+#         sol = optx.least_squares(residuals, solver, guess)
+#         sol_arr = sol_arr.at[:-1].set(sol.value)
+#         sol_arr = sol_arr.at[-1].set(jnp.sum(residuals(sol.value, None)**2))
+#         return sol_arr
+    
+#     sol_arr = jax.vmap(single_bee)(initial_condition_matrix.T).T
+#     best_guess = sol_arr[:-1, jnp.argmin(sol_arr[-1, :])]
+#     return best_guess
+    
+
+# seed = 1701
+# key = jax.random.key(seed)
+
+# z-score power measured
+# power_measured_z = (power_measured - jnp.mean(power_measured)) / jnp.std(power_measured)
+

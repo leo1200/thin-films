@@ -1,0 +1,170 @@
+%% Ex situ Interferometry Curve Simulation
+%% Initialize MATLAB
+close all;
+clc;
+clear all;
+
+function theta_transmitted = snell(n1, n2, theta_incidence)
+    theta_transmitted = asin(n1 ./ n2 .* sin(theta_incidence));
+end
+
+function r = calculate_reflection_coeff(n1, n2, theta_incidence, polstate)
+    if polstate == "Linear TE/perpendicular/s"
+        n = n2 / n1;
+        r = calculate_rs(n, theta_incidence);
+    elseif polstate == "Linear TM/parallel/p"
+        n = n2 / n1;
+        r = calculate_rp(n, theta_incidence);
+    else
+        disp("ERROR");
+        stop;
+    end
+end
+
+function rs = calculate_rs(n, theta_incidence)
+    rs = (cos(theta_incidence) - sqrt(n.^2 - cos(theta_incidence).^2)) ./ (cos(theta_incidence) + sqrt(n.^2 - cos(theta_incidence).^2));
+end
+
+function rp = calculate_rp(n, theta_incidence)
+    rp = (sqrt(n.^2 - sin(theta_incidence).^2) - n.^2 .* cos(theta_incidence)) ./ (sqrt(n.^2 - sin(theta_incidence).^2) + n.^2 .* cos(theta_incidence));
+end
+
+function ts = calculate_ts(n, theta_incidence)
+    ts = (2 .* cos(theta_incidence)) ./ (cos(theta_incidence) + sqrt(n.^2 - sin(theta_incidence).^2));
+end
+
+function tp = calculate_tp(n, theta_incidence)
+    tp = (2 .* n .* cos(theta_incidence)) ./ (n.^2 .* cos(theta_incidence) + sqrt(n.^2 - sin(theta_incidence).^2));
+end
+
+%% Source Parameters
+% Free-space wavelength  [nm]
+lam0 = 632.8;
+% Polar/Zenith angle  [°]
+theta = 25; theta = deg2rad(theta);
+% Azimuthal angle 
+phi = 0; phi = deg2rad(phi);
+% Polarization state
+polstate = "Linear TE/perpendicular/s"; [pte,ptm] = polanalyze(polstate);
+%% Scaling of REF
+I_inc         = 1;
+I_dark        = 0;
+%% Build Device
+%% Reflection Side/Frontside/Environment
+% Relative permeability (reflection side) 
+ur1 = 1;
+% Relative permittivity (reflection side) ; Note that 
+er1 = 1;
+n0 = sqrt(ur1*er1);
+%% Growth Layer
+% Start thickness
+d0 = 20;
+% Growth rate  [nm/min]
+v = 6.6;
+v = v/60;
+% Growth acceleration
+a = 0;
+% Growth time  [s]
+dt = length(powerValues);
+% Relative permeability (growth layer) 
+urv = 1;
+% Relative permittivity (growth layer) ; Note that 
+erv = 1.5^2;
+n1 = sqrt(urv*erv);
+%% Intermediate/Base Layers; Note the Order: Reflection Side -> Transmission Side
+% Thicknesses  (baselayers) [nm]
+L = [ 5 ];
+% Relative permeabilities  (baselayers)
+UR = [ 1 ];
+% Relative permittivities  (baselayers); Note that 
+ER = [ 1.45704^2 ];
+N = sqrt(UR.*ER);
+%% Transmission Side/Backside/Substrate
+% Backside transmission/reflection
+trn0 = 1;
+% Relative permeability (transmission side) 
+ur2 = 1;
+% Relative permittivity (transmission side) ; Note that 
+er2 = (3.8827+0.019626i)^2;
+n2 = sqrt(ur2*er2);
+
+%% Thickness Function
+L_1 = @(t) d0 + v.*t + 1/2 .* a .* t.^2;
+
+%% Model 1: One layer, no internal reflections
+REF_onelayer_nointernalreflections = @(t) cos(2 .* pi .* L_1(t) .* sqrt(n1.^2 - n0^2 .* sin(pi-theta).^2) ./ lam0).^2;
+I_onelayer_nointernalreflections = @(t) I_inc .* REF_onelayer_nointernalreflections(t) + I_dark;
+
+%% Model 1: One layer, no internal reflections, new implementation
+theta_transmitted = snell(n0, n1, theta);
+delta = @(t) (2 .* pi .* L_1(t) .* sqrt(n1.^2 - n0.^2 .* sin(pi-theta).^2)) ./ lam0;
+r01 = calculate_reflection_coeff(n0, n1, theta, polstate); 
+r12 = calculate_reflection_coeff(n1, n2, theta_transmitted, polstate);
+REF_onelayer_nointernalreflections = @(t) abs(r01 + (1 - r01.^2) .* r12 .* exp(2i .* delta(t))).^2;
+I_onelayer_nointernalreflections = @(t) I_inc .* REF_onelayer_nointernalreflections(t) + I_dark;
+
+%% Model 2: One layer, internal reflections
+r10 = -calculate_reflection_coeff(n0, n1, theta_transmitted, polstate);  
+REF_onelayer_internalreflections = @(t) abs((r01 + r12 .* exp(2i .* delta(t))) ./ (1 - r10 .* r12 .* exp(2i .* delta(t)))).^2;
+I_onelayer_internalreflections = @(t) I_inc .* REF_onelayer_internalreflections(t) + I_dark;
+
+%% Model 3: Multiple layers, no internal reflections
+hurensohn_N = [n0, n1, N, n2];
+NLAY = length(L) + 1;
+delta1 = @(t) delta(t); % phase shift/gain for growth layer
+
+theta_array = zeros(NLAY+1,1); % angle in reflection half-space, growth layer, baserlayers
+theta_array(1) = theta;
+for j = 2:(NLAY+1)
+    theta_array(j) = snell(hurensohn_N(j-1), hurensohn_N(j), theta_array(j-1));
+end
+
+delta_array = zeros(NLAY-1,1); % phase shift/gain for baselayers
+for l = 1:length(delta_array)
+    delta_array(l) = (2 .* pi .* L(l) .* sqrt(hurensohn_N(l+2).^2 - hurensohn_N(l+1).^2 .* sin(pi-theta_array(l+2)).^2)) ./ lam0;
+end
+
+reflectivity_multiplelayers_nointernalreflections = @(t) -r01;
+
+for j = 2:(NLAY+1)
+    backside_reflection_coefficient = calculate_reflection_coeff(hurensohn_N(j), hurensohn_N(j+1), theta_array(j), polstate);
+    intermediate_product = @(t) backside_reflection_coefficient .* (1 - r01.^2) .* exp(2i .* delta1(t));
+    if j ~= 2
+        for k = 3:j
+            %transmission_reflection = calculate_reflection_coeff(hurensohn_N(k-1), hurensohn_N(k), theta_array(k-1), polstate);
+            transmission_reflection = calculate_reflection_coeff(hurensohn_N(k-1), hurensohn_N(k), theta_array(k), polstate);
+            intermediate_product = @(t) intermediate_product(t) .* (1 - transmission_reflection.^2) .* exp(2i .* delta_array(k-2));
+        end
+    end
+    reflectivity_multiplelayers_nointernalreflections = @(t) reflectivity_multiplelayers_nointernalreflections(t) + intermediate_product(t);
+end
+
+REF_multiplelayers_nointernalreflections = @(t) abs(reflectivity_multiplelayers_nointernalreflections(t)).^2;
+I_multiplelayers_nointernalreflections = @(t) I_inc .* REF_multiplelayers_nointernalreflections(t) + I_dark;
+
+%% Model 4: Multiple layers, internal reflections
+reflectivity_multiplelayers_internalreflections = @(t) -r01;
+
+for j = 2:(NLAY+1)
+    backside_reflection_coefficient = calculate_reflection_coeff(hurensohn_N(j), hurensohn_N(j+1), theta_array(j), polstate);
+    topside_reflection_coefficient = calculate_reflection_coeff(hurensohn_N(j-1), hurensohn_N(j), theta_array(j), polstate);
+    intermediate_product = @(t) backside_reflection_coefficient .* (1 - r01.^2) .* exp(2i .* delta1(t));
+    if j ~= 2
+        for k = 3:j
+            transmission_reflection = calculate_reflection_coeff(hurensohn_N(k-1), hurensohn_N(k), theta_array(k), polstate);
+            %transmission_reflection = calculate_reflection_coeff(hurensohn_N(k), hurensohn_N(k-1), theta_array(k), polstate);
+            intermediate_product = @(t) intermediate_product(t) .* (1 - transmission_reflection.^2) .* exp(2i .* delta_array(k-2));
+        end
+    end
+
+    if j == 2
+        intermediate_product = @(t) intermediate_product(t) ./ (1 - topside_reflection_coefficient .* backside_reflection_coefficient .* exp(2i .* delta1(t)));
+    else
+        intermediate_product = @(t) intermediate_product(t) ./ (1 - topside_reflection_coefficient .* backside_reflection_coefficient .* exp(2i .* delta_array(j-2)));
+    end
+    
+    reflectivity_multiplelayers_internalreflections = @(t) reflectivity_multiplelayers_internalreflections(t) + intermediate_product(t);
+end
+
+REF_multiplelayers_internalreflections = @(t) abs(reflectivity_multiplelayers_internalreflections(t)).^2;
+I_multiplelayers_internalreflections = @(t) I_inc .* REF_multiplelayers_internalreflections(t) + I_dark;
