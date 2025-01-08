@@ -100,16 +100,18 @@ MULTIPLE_LAYERS_NO_INTERNAL_REFLECTIONS = 2
 MULTIPLE_LAYERS_INTERNAL_REFLECTIONS = 3
 TRANSFER_MATRIX_METHOD = 4
 
+MIN_MAX_NORMALIZATION = 1
 
-# @partial(jax.jit, static_argnames=['backside_mode', 'model'])
-def normalized_forward_model(
+@partial(jax.jit, static_argnames=['backside_mode', 'model', 'normalization'])
+def forward_model(
     model: int,
     setup_params: SetupParams,
     optics_params: OpticsParams,
     static_layer_params: LayerParams,
     variable_layer_params: LayerParams,
     variable_layer_thicknesses: Float[Array, "num_timepoints"],
-    backside_mode: int
+    backside_mode: int,
+    normalization: int = MIN_MAX_NORMALIZATION
 ) -> Tuple[Float[Array, "num_timepoints"], Float[Array, "num_timepoints"], Float[Array, "num_timepoints"]]:
     """
     TODO: write docstring
@@ -169,8 +171,11 @@ def normalized_forward_model(
         )(thickness_matrix)
     else:
         raise ValueError("Invalid model choice")
+    
+    if normalization == MIN_MAX_NORMALIZATION:
+        out = (out - 0.5 * (jnp.min(out) + jnp.max(out))) / (0.5 * (jnp.max(out) - jnp.min(out)))
 
-    return (out - 0.5 * (jnp.min(out) + jnp.max(out))) / (0.5 * (jnp.max(out) - jnp.min(out)))
+    return out
 
 
 

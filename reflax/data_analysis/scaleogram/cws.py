@@ -66,7 +66,10 @@ class CWT:
             wavelet = get_default_wavelet()
 
         # Compute CWT
-        dt = time[1]-time[0]
+        # dt = time[1]-time[0]
+        # use the mean time difference to avoid issues with irregular time steps
+        dt = np.mean(np.diff(time))
+
         coefs, scales_freq = CWT_FUN(signal, scales, wavelet, dt)
         # Note about frequencies values:
         #   The value returned by PyWt is
@@ -205,6 +208,9 @@ def cws(time, signal=None, scales=None, wavelet=None,
     # plot the 2D spectrum using a pcolormesh to specify the correct Y axis
     # location at each scale
     qmesh = ax.pcolormesh(xmesh, ymesh, values, cmap=cmap, norm=cnorm)
+
+    # plot the maximum values of the spectrum over the time axis
+    # ax.plot(time, scales_period[np.argmax(values, axis=0)], 'w.')
 
     if clim:
         qmesh.set_clim(*clim)

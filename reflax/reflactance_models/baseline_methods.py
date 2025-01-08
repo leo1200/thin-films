@@ -20,9 +20,15 @@ def one_layer_no_internal_reflections(
     n0 = jnp.sqrt(optics_params.permeability_reflection * optics_params.permittivity_reflection)
     n1 = jnp.sqrt(layer_params.permeabilities * layer_params.permittivities)
 
+    n2 = jnp.sqrt(optics_params.permeability_transmission * optics_params.permittivity_transmission)
     delta = 2 * jnp.pi * layer_params.thicknesses * jnp.sqrt(n1 ** 2 - n0 ** 2 * jnp.sin(setup_params.polar_angle) ** 2) / setup_params.wavelength
+    theta_transmitted = snell(n0, n1, setup_params.polar_angle)
 
-    return jnp.cos(delta) ** 2
+    r01 = calculate_reflection_coeff(n0, n1, setup_params.polar_angle, setup_params.polstate)
+    r12 = calculate_reflection_coeff(n1, n2, theta_transmitted, setup_params.polstate)
+
+    # return jnp.cos(delta) ** 2
+    return jnp.abs(r01 + (1 - r01 ** 2) * r12 * jnp.exp(2j * delta)) ** 2
 
 
 @jax.jit
@@ -39,7 +45,7 @@ def one_layer_internal_reflections(
     n1 = jnp.sqrt(layer_params.permeabilities * layer_params.permittivities)
     n2 = jnp.sqrt(optics_params.permeability_transmission * optics_params.permittivity_transmission)
 
-    delta = 2 * jnp.pi * layer_params.thicknesses * jnp.sqrt(n1 ** 2 - n0 ** 2 * jnp.sin(setup_params.polar_angle) ** 2) / setup_params.wavelength
+    delta = 2 * jnp.pi * layer_params.thicknesses * jnp.sqrt(n1 ** 2 - n0 ** 2 * jnp.sin(jnp.pi - setup_params.polar_angle) ** 2) / setup_params.wavelength
 
     theta_transmitted = snell(n0, n1, setup_params.polar_angle)
 
