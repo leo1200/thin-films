@@ -45,3 +45,41 @@
 # z-score power measured
 # power_measured_z = (power_measured - jnp.mean(power_measured)) / jnp.std(power_measured)
 
+from sympy import symbols, Eq, solve, sqrt
+
+# Define known variables
+f_alpha, f_beta, f_gamma = symbols('f_alpha f_beta f_gamma', real=True, positive=True)
+lambda_alpha, lambda_beta, lambda_gamma = symbols('lambda_alpha lambda_beta lambda_gamma', real=True, positive=True)
+Q = symbols('Q', real=True, positive=True)
+
+# Define unknown variables
+v, A, B = symbols('v A B', real=True)
+
+# Define the equations
+eq1 = Eq(f_alpha, v * sqrt((A + B / lambda_alpha**2)**2 - Q**2) / lambda_alpha)
+eq2 = Eq(f_beta, v * sqrt((A + B / lambda_beta**2)**2 - Q**2) / lambda_beta)
+eq3 = Eq(f_gamma, v * sqrt((A + B / lambda_gamma**2)**2 - Q**2) / lambda_gamma)
+
+print("=== SOLVING THE SYSTEM OF EQUATIONS ===")
+
+# Solve the system of equations
+solution = solve([eq1, eq2, eq3], (v, A, B), dict=True)
+
+print("=== SIMPLIFYING THE SOLUTION ===")
+
+# simplify the solution
+for sol in solution:
+    sol[v] = sol[v].simplify()
+    sol[A] = sol[A].simplify()
+    sol[B] = sol[B].simplify()
+
+# Display the solution
+print("Solutions:")
+for sol in solution:
+    print(sol)
+
+# Save the solutions to a txt file
+with open("solutions.txt", "w") as f:
+    for sol in solution:
+        f.write(str(sol) + "\n")
+        f.write("\n")
