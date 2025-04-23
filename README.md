@@ -23,6 +23,8 @@ We achieve this by using a
 
 i.e. *we can get the thickness as a function of time only from the reflectance signal of a single wavelength and the corresponding refractive index of the film at that wavelength*. To measure this, only a very simple inexpensive setup is required.
 
+This is implemented in [analysis\estimate_growth.py](analysis\estimate_growth.py).
+
 Below, the measurement setup is illustrated.
 
 | ![Model Overview](model.png) |
@@ -31,13 +33,13 @@ Below, the measurement setup is illustrated.
 
 Below, experimental and validation results are shown.
 
-| ![Analysis of Real-World Measurement](analysis\figures\neural_network_thickness_model_results_M1.svg) |
-|:------------------------------------------------:|
-| Analysis of a Real-World Measurement             |
+| ![Analysis of Real-World Measurement](analysis.svg) |
+|:---------------------------------------------------:|
+| Analysis of a Real-World Measurement                |
 
-| ![Validation on a Given Thickness Profile](analysis\figures\neural_network_thickness_model_results_validation.svg) |
-|:-----------------------------------------------------:|
-| Validation on a Given Thickness Profile               |
+| ![Validation on a Given Thickness Profile](validation.svg) |
+|:----------------------------------------------------------:|
+| Validation on a Given Thickness Profile                    |
 
 ## Idea for Training Speedup - Speeding Up Learning Neural Network Terms in Differentiable Simulators using Operator Learning / Refining Operator Learning Results using Differentiable Simulators
 
@@ -52,3 +54,5 @@ With a measurement setup for spectral reflectance as in [González-Ramírez et a
 - [ ] further validation on synthetic data, hyperparameter tuning
 - [ ] trying the operator learning approach for training speedup
 - [ ] testing and validation on spectral data, demonstrate that a Cauchy model and growth function can be learned simultaneously
+- [ ] cleanup and refactoring of the codebase
+- [ ] documentation
