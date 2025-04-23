@@ -26,7 +26,7 @@ We achieve this by using a
 
 i.e. *we can get the thickness as a function of time only from the reflectance signal of a single wavelength and the corresponding refractive index of the film at that wavelength*. To measure this, only a very simple inexpensive setup is required.
 
-This is implemented in [analysis\estimate_growth.py](analysis\estimate_growth.py).
+This is implemented in [analysis/estimate_growth.py](analysis/estimate_growth.py).
 
 Below, the measurement setup is illustrated.
 
