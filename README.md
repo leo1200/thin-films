@@ -7,7 +7,7 @@ For measuring the growth behavior of thin films, in our case from Initiated Chem
 - **Spectroscopic Ellipsometry**: This is a non-destructive optical technique that measures the change in polarization as light reflects or transmits from a material structure. It provides information about the thickness and optical properties of thin films. Ellipsometry, however, requires an expensive, complex setup which is challenging to in-situ integrate into a deposition system.
 - **Spectroscopic Interferometry**: Using a model for the reflectance of the film over a range of wavelengths, the film thickness is determined, as in [González-Ramírez et al. (2009)](https://doi.org/10.1155/2009/594175). For this however, one needs to know the refractive index of the film as a function of wavelength, requiring additional measurements and errors in the refractive index will propagate into the thickness measurement. Also one still needs a spectral measurement setup.
 
-with other techniques not discussed here being Rutherford backscattering spectroscopy and transmission electron microscopy techniques.
+with other techniques not discussed here being Rutherford backscattering spectroscopy and GIXRD/XRR techniques.
 
 To wrap up, current techniques are either costly, complex or need additional information on the material properties.
 
