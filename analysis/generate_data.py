@@ -33,7 +33,7 @@ except ImportError:
 # os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 
 # =============================================================================
-# Configuration & Parameters (Consider using argparse for command-line)
+# Configuration & Parameters
 # =============================================================================
 def parse_args():
     parser = argparse.ArgumentParser(description="Generate Thickness-Reflectance Training Data")
@@ -41,13 +41,16 @@ def parse_args():
     parser.add_argument('--n_lin', type=int, default=500, help='Number of piecewise-linear derivative profiles')
     parser.add_argument('--n_const', type=int, default=100, help='Number of constant derivative (linear) profiles')
     parser.add_argument('--num_eval', type=int, default=100, help='Number of evaluation points for each profile')
-    parser.add_argument('--min_final_thickness', type=float, default=800.0, help='Minimum final thickness (nm)')
-    parser.add_argument('--max_final_thickness', type=float, default=1000.0, help='Maximum final thickness (nm)')
+    parser.add_argument('--min_final_thickness', type=float, default=100.0, help='Minimum final thickness (nm)')
+    parser.add_argument('--max_final_thickness', type=float, default=1500.0, help='Maximum final thickness (nm)')
     parser.add_argument('--poly_base_degree', type=int, default=3, help='Base degree for polynomial generator')
     parser.add_argument('--poly_max_deriv', type=float, default=2.0, help='Max derivative constraint for polynomial H\'(x)')
     parser.add_argument('--pwl_max_deriv', type=float, default=2.0, help='Max derivative constraint for PWL H\'(x)')
     parser.add_argument('--output_file', type=str, default='training_data.npz', help='Output file name for saved data')
-    parser.add_argument('--plot_file', type=str, default='generated_thicknesses.png', help='Output file name for plot')
+    parser.add_argument('--plot_file_thickness', type=str, default='generated_thicknesses.png', help='Output file name for thickness plot')
+    # --- New argument for reflectance plot ---
+    parser.add_argument('--plot_file_reflectance', type=str, default='generated_reflectances.png', help='Output file name for reflectance plot')
+    # --- End new argument ---
     parser.add_argument('--seed', type=int, default=42, help='Random seed')
     parser.add_argument('--skip_forward_model', action='store_true', help='Skip reflectance calculation (e.g., if reflax is unavailable)')
     return parser.parse_args()
@@ -188,7 +191,7 @@ def generate_params_max_deriv_nondecreasing(key, max_derivative, xmin=0.1, xmax=
     _, _, valid_params = final_state
     return valid_params # Returns (c, y0, yc, y1)
 
-
+# @jit
 def evaluate_pwl_single_from_params(params, x):
     """Evaluates a single PWL function H(x) from parameters."""
     c, y0, yc, y1 = params
@@ -286,8 +289,8 @@ def setup_forward_model() -> Tuple[Callable, SetupParams, OpticsParams, LayerPar
     permeability_variable_layer = 1.0
     permittivity_variable_layer = (n_variable + 1j * k_variable)**2
     variable_layer_params = LayerParams(
-        permeabilities = jnp.array([permeability_variable_layer]), # Must be array
-        permittivities = jnp.array([permittivity_variable_layer]), # Must be array
+        permeabilities = permeability_variable_layer,
+        permittivities = permittivity_variable_layer,
         thicknesses = None # This will be provided during the call
     )
 
@@ -333,6 +336,7 @@ def main(args):
     x_eval = jnp.linspace(0.0, 1.0, args.num_eval)
 
     all_thickness_profiles = []
+    profile_types = [] # Keep track of the type for plotting
 
     # --- 1. Generate Polynomial Thicknesses ---
     if args.n_pol > 0:
@@ -340,31 +344,16 @@ def main(args):
         start_time = pytime.time()
         key, subkey_coeffs, subkey_tf = random.split(key, 3)
         keys_coeffs = random.split(subkey_coeffs, args.n_pol)
-
-        # Generate base polynomial coefficients H(x) where H(1)=1
         poly_coeffs = vmap_random_monotonic_convex_polynomial(
-            keys_coeffs,
-            args.poly_base_degree,
-            args.poly_max_deriv,
-            1000, # n_grid for generation
-            1e-6, # epsilon
-            1e-7  # integral_tol
+            keys_coeffs, args.poly_base_degree, args.poly_max_deriv, 1000, 1e-6, 1e-7
         )
-
-        # Evaluate base polynomials H(x)
-        base_poly_profiles = vmap_evaluate_polynomial(poly_coeffs, x_eval) # Shape: (N_pol, num_eval)
-
-        # Generate random final thicknesses
+        base_poly_profiles = vmap_evaluate_polynomial(poly_coeffs, x_eval)
         final_thicknesses_pol = random.uniform(
-            subkey_tf,
-            shape=(args.n_pol, 1), # Ensure broadcastable shape
-            minval=args.min_final_thickness,
-            maxval=args.max_final_thickness
+            subkey_tf, (args.n_pol, 1), minval=args.min_final_thickness, maxval=args.max_final_thickness
         )
-
-        # Scale profiles
         thickness_profiles_pol = base_poly_profiles * final_thicknesses_pol
         all_thickness_profiles.append(thickness_profiles_pol)
+        profile_types.extend(['polynomial'] * args.n_pol)
         print(f"Polynomial generation took {pytime.time() - start_time:.2f}s")
 
     # --- 2. Generate Piecewise Linear Derivative Thicknesses ---
@@ -373,55 +362,31 @@ def main(args):
         start_time = pytime.time()
         key, subkey_params, subkey_tf = random.split(key, 3)
         keys_params = random.split(subkey_params, args.n_lin)
-
-        # Generate base PWL parameters H(x) where H(1)=1
-        # Jit the vmapped generator for efficiency
         jit_vmap_generate_pwl = jax.jit(vmap_generate_pwl_params, static_argnums=(1, 2, 3, 4))
-        params_batch_tuple = jit_vmap_generate_pwl(
-            keys_params, args.pwl_max_deriv, 0.1, 0.9, 1e-6 # xmin, xmax, eps
-        )
-        # Stack parameters for evaluation
-        params_batch = jnp.stack(params_batch_tuple, axis=-1) # Shape: (N_lin, 4)
-
-
-        # Evaluate base PWL functions H(x)
-        base_pwl_profiles = vmap_evaluate_pwl(params_batch, x_eval) # Shape: (N_lin, num_eval)
-
-        # Generate random final thicknesses
+        params_batch_tuple = jit_vmap_generate_pwl(keys_params, args.pwl_max_deriv, 0.1, 0.9, 1e-6)
+        params_batch = jnp.stack(params_batch_tuple, axis=-1)
+        base_pwl_profiles = vmap_evaluate_pwl(params_batch, x_eval)
         final_thicknesses_lin = random.uniform(
-            subkey_tf,
-            shape=(args.n_lin, 1),
-            minval=args.min_final_thickness,
-            maxval=args.max_final_thickness
+            subkey_tf, (args.n_lin, 1), minval=args.min_final_thickness, maxval=args.max_final_thickness
         )
-
-        # Scale profiles
         thickness_profiles_lin = base_pwl_profiles * final_thicknesses_lin
         all_thickness_profiles.append(thickness_profiles_lin)
+        profile_types.extend(['pwl'] * args.n_lin)
         print(f"PWL generation took {pytime.time() - start_time:.2f}s")
 
     # --- 3. Generate Constant Derivative (Linear) Thicknesses ---
     if args.n_const > 0:
         print(f"\nGenerating {args.n_const} constant derivative (linear) profiles...")
         start_time = pytime.time()
-        # Base profile H(x) = x
-        base_const_profile = x_eval # Shape: (num_eval,)
-
-        # Generate regularly spaced final thicknesses
+        base_const_profile = x_eval
         if args.n_const == 1:
-             # Avoid linspace issue with num=1, place it in the middle
              final_thicknesses_const = jnp.array([(args.min_final_thickness + args.max_final_thickness) / 2.0])
         else:
-            final_thicknesses_const = jnp.linspace(
-                args.min_final_thickness,
-                args.max_final_thickness,
-                args.n_const
-            )
-        final_thicknesses_const = final_thicknesses_const.reshape(args.n_const, 1) # Reshape for broadcasting
-
-        # Scale profile (broadcasting base_const_profile)
-        thickness_profiles_const = base_const_profile * final_thicknesses_const # Shape: (N_const, num_eval)
+            final_thicknesses_const = jnp.linspace(args.min_final_thickness, args.max_final_thickness, args.n_const)
+        final_thicknesses_const = final_thicknesses_const.reshape(args.n_const, 1)
+        thickness_profiles_const = base_const_profile * final_thicknesses_const
         all_thickness_profiles.append(thickness_profiles_const)
+        profile_types.extend(['constant'] * args.n_const)
         print(f"Constant derivative generation took {pytime.time() - start_time:.2f}s")
 
     # --- Combine all thickness profiles ---
@@ -430,34 +395,33 @@ def main(args):
         return
 
     combined_thicknesses = jnp.concatenate(all_thickness_profiles, axis=0)
+    # profile_types list now corresponds row-wise to combined_thicknesses
     print(f"\nTotal generated thickness profiles: {combined_thicknesses.shape[0]}")
-    print(f"Thickness profile shape: {combined_thicknesses.shape}") # Should be (N_total, num_eval)
+    print(f"Thickness profile shape: {combined_thicknesses.shape}")
 
     # --- Calculate Reflectances using Forward Model ---
+    reflectances_calculated = False
     if REFLAX_AVAILABLE and not args.skip_forward_model:
         print("\nCalculating reflectances using forward model...")
         start_time = pytime.time()
-        forward_model_func, *_ = setup_forward_model() # Get the callable
-
+        forward_model_func, *_ = setup_forward_model()
         if forward_model_func is None:
              print("Forward model function setup failed. Skipping reflectance calculation.")
-             combined_reflectances = jnp.full_like(combined_thicknesses, jnp.nan) # Placeholder
+             combined_reflectances = jnp.full_like(combined_thicknesses, jnp.nan)
         else:
-            # Vmap the forward model over the batch of thickness profiles
             vmap_forward_model = jit(vmap(forward_model_func, in_axes=0))
-
-            # Run calculation (potentially uses GPU)
             combined_reflectances = vmap_forward_model(combined_thicknesses)
-            combined_reflectances.block_until_ready() # Ensure calculation finishes
+            combined_reflectances.block_until_ready()
+            reflectances_calculated = True # Mark as calculated
             print(f"Reflectance calculation took {pytime.time() - start_time:.2f}s")
-            print(f"Reflectance profile shape: {combined_reflectances.shape}") # Should match thickness shape
+            print(f"Reflectance profile shape: {combined_reflectances.shape}")
 
     elif args.skip_forward_model:
         print("\nSkipping reflectance calculation as requested.")
-        combined_reflectances = jnp.full_like(combined_thicknesses, jnp.nan) # Placeholder
+        combined_reflectances = jnp.full_like(combined_thicknesses, jnp.nan)
     else:
         print("\nSkipping reflectance calculation because reflax library is not available.")
-        combined_reflectances = jnp.full_like(combined_thicknesses, jnp.nan) # Placeholder
+        combined_reflectances = jnp.full_like(combined_thicknesses, jnp.nan)
 
 
     # --- Save Data ---
@@ -465,7 +429,7 @@ def main(args):
     try:
         np.savez_compressed(
             args.output_file,
-            thicknesses=np.array(combined_thicknesses), # Convert JAX array to NumPy array for saving
+            thicknesses=np.array(combined_thicknesses),
             reflectances=np.array(combined_reflectances),
             x_eval=np.array(x_eval),
             n_pol=args.n_pol,
@@ -473,60 +437,96 @@ def main(args):
             n_const=args.n_const,
             min_final_thickness=args.min_final_thickness,
             max_final_thickness=args.max_final_thickness,
-            num_eval=args.num_eval
+            num_eval=args.num_eval,
+            profile_types=np.array(profile_types) # Save profile types too
         )
         print("Data saved successfully.")
     except Exception as e:
         print(f"Error saving data: {e}")
 
     # --- Plotting ---
-    print(f"\nGenerating plot of thickness profiles ({args.plot_file})...")
-    plt.figure(figsize=(10, 6))
     num_to_plot = min(N_total, 100) # Plot a subset to avoid clutter
-    indices_to_plot = np.random.choice(N_total, num_to_plot, replace=False)
+    # Ensure we have profiles to plot before sampling
+    if N_total > 0:
+        indices_to_plot = np.random.choice(N_total, num_to_plot, replace=False)
+    else:
+        indices_to_plot = np.array([], dtype=int) # Empty array if no profiles
 
-    # Plot polynomial profiles first (if any)
-    start_idx = 0
-    end_idx = args.n_pol
-    indices_in_range = indices_to_plot[(indices_to_plot >= start_idx) & (indices_to_plot < end_idx)]
-    if len(indices_in_range) > 0:
-        plt.plot(x_eval, combined_thicknesses[indices_in_range, :].T, color='blue', alpha=0.3, lw=1, label=f'Polynomial (Subset, N={len(indices_in_range)})' if start_idx==0 else "")
+    # --- Plot Thicknesses ---
+    if len(indices_to_plot) > 0:
+        print(f"\nGenerating plot of thickness profiles ({args.plot_file_thickness})...")
+        plt.figure(figsize=(10, 6))
 
-    # Plot PWL profiles
-    start_idx = args.n_pol
-    end_idx = args.n_pol + args.n_lin
-    indices_in_range = indices_to_plot[(indices_to_plot >= start_idx) & (indices_to_plot < end_idx)]
-    if len(indices_in_range) > 0:
-        plt.plot(x_eval, combined_thicknesses[indices_in_range, :].T, color='green', alpha=0.3, lw=1, label=f'PWL Deriv (Subset, N={len(indices_in_range)})' if args.n_pol==0 else "")
+        # Define colors for consistency
+        colors = {'polynomial': 'blue', 'pwl': 'green', 'constant': 'red'}
+        plotted_labels = set()
 
-    # Plot constant derivative profiles
-    start_idx = args.n_pol + args.n_lin
-    end_idx = N_total
-    indices_in_range = indices_to_plot[(indices_to_plot >= start_idx) & (indices_to_plot < end_idx)]
-    if len(indices_in_range) > 0:
-        plt.plot(x_eval, combined_thicknesses[indices_in_range, :].T, color='red', alpha=0.3, lw=1, label=f'Const Deriv (Subset, N={len(indices_in_range)})' if (args.n_pol+args.n_lin)==0 else "")
+        for i in indices_to_plot:
+            ptype = profile_types[i]
+            color = colors.get(ptype, 'grey') # Default color if type unknown
+            label = f'{ptype.capitalize()} (Subset)' if ptype not in plotted_labels else ""
+            plt.plot(x_eval, combined_thicknesses[i, :], color=color, alpha=0.3, lw=1, label=label)
+            if label:
+                plotted_labels.add(ptype)
 
-    # Add lines for min/max final thickness
-    plt.axhline(args.min_final_thickness, color='grey', linestyle='--', label=f'Min Final T = {args.min_final_thickness:.0f} nm')
-    plt.axhline(args.max_final_thickness, color='grey', linestyle='--', label=f'Max Final T = {args.max_final_thickness:.0f} nm')
+        plt.axhline(args.min_final_thickness, color='grey', linestyle='--', label=f'Min Final T = {args.min_final_thickness:.0f} nm')
+        plt.axhline(args.max_final_thickness, color='grey', linestyle='--', label=f'Max Final T = {args.max_final_thickness:.0f} nm')
 
-    plt.xlabel("Normalized Process Variable (x)")
-    plt.ylabel("Layer Thickness (nm)")
-    plt.title(f"Generated Thickness Profiles (N_total = {N_total})")
-    plt.ylim(bottom=0) # Start y-axis at 0
-    plt.grid(True, linestyle=':', alpha=0.6)
+        plt.xlabel("Normalized Process Variable (x)")
+        plt.ylabel("Layer Thickness (nm)")
+        plt.title(f"Generated Thickness Profiles (Subset N = {num_to_plot} of {N_total})")
+        plt.ylim(bottom=0)
+        plt.grid(True, linestyle=':', alpha=0.6)
 
-    # Create legend with unique labels
-    handles, labels = plt.gca().get_legend_handles_labels()
-    by_label = dict(zip(labels, handles)) # Remove duplicate labels
-    plt.legend(by_label.values(), by_label.keys(), fontsize='small')
+        handles, labels = plt.gca().get_legend_handles_labels()
+        by_label = dict(zip(labels, handles))
+        plt.legend(by_label.values(), by_label.keys(), fontsize='small')
 
-    try:
-        plt.savefig(args.plot_file, dpi=300)
-        print(f"Plot saved successfully to {args.plot_file}")
-    except Exception as e:
-        print(f"Error saving plot: {e}")
-    # plt.show() # Uncomment to display plot interactively
+        try:
+            plt.savefig(args.plot_file_thickness, dpi=300)
+            print(f"Thickness plot saved successfully to {args.plot_file_thickness}")
+        except Exception as e:
+            print(f"Error saving thickness plot: {e}")
+        # plt.show() # Uncomment to display plot interactively
+        plt.close() # Close figure to free memory
+
+    # --- Plot Reflectances ---
+    if reflectances_calculated and len(indices_to_plot) > 0:
+        print(f"\nGenerating plot of reflectance profiles ({args.plot_file_reflectance})...")
+        plt.figure(figsize=(10, 6))
+
+        # Reuse colors and subset indices
+        colors = {'polynomial': 'darkblue', 'pwl': 'darkgreen', 'constant': 'darkred'} # Slightly different colors
+        plotted_labels = set()
+
+        for i in indices_to_plot:
+             ptype = profile_types[i]
+             color = colors.get(ptype, 'grey')
+             label = f'{ptype.capitalize()} Reflectance (Subset)' if ptype not in plotted_labels else ""
+             plt.plot(x_eval, combined_reflectances[i, :], color=color, alpha=0.3, lw=1, label=label)
+             if label:
+                 plotted_labels.add(ptype)
+
+        plt.xlabel("Normalized Process Variable (x)")
+        plt.ylabel("Normalized Reflectance") # Assuming MIN_MAX_NORMALIZATION
+        plt.title(f"Generated Reflectance Profiles (Subset N = {num_to_plot} of {N_total})")
+        plt.ylim(-1.1, 1.1) # Adjust if using different normalization
+        plt.grid(True, linestyle=':', alpha=0.6)
+
+        handles, labels = plt.gca().get_legend_handles_labels()
+        by_label = dict(zip(labels, handles))
+        plt.legend(by_label.values(), by_label.keys(), fontsize='small')
+
+        try:
+            plt.savefig(args.plot_file_reflectance, dpi=300)
+            print(f"Reflectance plot saved successfully to {args.plot_file_reflectance}")
+        except Exception as e:
+            print(f"Error saving reflectance plot: {e}")
+        # plt.show() # Uncomment to display plot interactively
+        plt.close() # Close figure
+
+    elif len(indices_to_plot) > 0:
+        print(f"\nSkipping reflectance plot because reflectances were not calculated.")
 
 
     print("\nData generation complete.")

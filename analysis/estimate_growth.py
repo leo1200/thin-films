@@ -1,6 +1,6 @@
 # GPU selection
 import os
-os.environ["CUDA_VISIBLE_DEVICES"] = "3"
+os.environ["CUDA_VISIBLE_DEVICES"] = "1"
 
 # typing
 from typing import Tuple
