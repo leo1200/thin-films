@@ -52,7 +52,7 @@ if use_simulated_data:
 # =================== ↓ data preprocessing ↓ ==================
 # -------------------------------------------------------------
 
-measurement = np.loadtxt("reflectance.txt", skiprows = 1)
+measurement = np.loadtxt("measurements/reflectance.txt", skiprows = 1)
 time_raw = jnp.array(measurement[:-100, 0])
 
 # convert the time to hours, numerically ~ nicely between 0 and 1

@@ -1,40 +1,55 @@
+"""
+
+Generate training data consisting of
+
+ - polynomial thicknesses, convex and monotonic, with given max derivative
+ - piecewise linear derivative thicknesses, convex and monotonic, with given max derivative
+ - linear thicknesses
+
+and their corresponding reflectances.
+
+"""
+
+# GPU selection
 import os
-import jax
-import jax.numpy as jnp
-from jax import random, jit, vmap
-import functools
-import matplotlib.pyplot as plt
-import time as pytime
-import numpy as np
-from typing import Tuple, Callable
+os.environ["CUDA_VISIBLE_DEVICES"] = "3"
+
+# argument passing
 import argparse
 
-# reflax imports (assuming reflax is installed and accessible)
-# If not, you might need to adjust the import paths or install the library
-try:
-    from reflax import polanalyze
-    from reflax.parameter_classes.parameters import (
-        OpticsParams,
-        SetupParams,
-        LayerParams
-    )
-    from reflax.forward_model.variable_layer_size import (
-        MIN_MAX_NORMALIZATION,
-        ONE_LAYER_INTERNAL_REFLECTIONS,
-        TRANSFER_MATRIX_METHOD
-    )
-    from reflax.forward_model.variable_layer_size import forward_model as reflax_forward_model
-    REFLAX_AVAILABLE = True
-except ImportError:
-    print("Warning: reflax library not found. Forward model calculation will be skipped.")
-    REFLAX_AVAILABLE = False
+# typing
+from typing import Callable, Tuple
 
-# GPU selection (optional, uncomment if needed)
-# os.environ["CUDA_VISIBLE_DEVICES"] = "0"
+# timing
+import time as pytime
 
-# =============================================================================
-# Configuration & Parameters
-# =============================================================================
+# numerics
+import jax
+import numpy as np
+import jax.numpy as jnp
+from jax import random, vmap, jit
+
+# reflax (our library)
+from reflax import polanalyze
+from reflax.parameter_classes.parameters import (
+    OpticsParams,
+    SetupParams,
+    LayerParams
+)
+from reflax.forward_model.variable_layer_size import (
+    MIN_MAX_NORMALIZATION,
+    ONE_LAYER_INTERNAL_REFLECTIONS,
+    TRANSFER_MATRIX_METHOD
+)
+from reflax.forward_model.variable_layer_size import forward_model
+
+# plotting
+import matplotlib.pyplot as plt
+
+# -------------------------------------------------------------
+# ======================= ↓ arguments ↓ =======================
+# -------------------------------------------------------------
+
 def parse_args():
     parser = argparse.ArgumentParser(description="Generate Thickness-Reflectance Training Data")
     parser.add_argument('--n_pol', type=int, default=500, help='Number of polynomial profiles')
@@ -55,9 +70,13 @@ def parse_args():
     parser.add_argument('--skip_forward_model', action='store_true', help='Skip reflectance calculation (e.g., if reflax is unavailable)')
     return parser.parse_args()
 
-# =============================================================================
-# Polynomial Thickness Generation (Copied from user input)
-# =============================================================================
+# -------------------------------------------------------------
+# ======================= ↑ arguments ↑ =======================
+# -------------------------------------------------------------
+
+# -------------------------------------------------------------
+# ================= ↓ polynomial thicknesses ↓ ================
+# -------------------------------------------------------------
 
 def _calculate_alpha(max_g0: float, integral_g0: float, max_derivative: float, epsilon: float) -> float:
     """Calculates the scaling factor alpha."""
@@ -70,7 +89,6 @@ def _calculate_alpha(max_g0: float, integral_g0: float, max_derivative: float, e
         operand=None
     )
     return alpha
-
 
 def random_monotonic_convex_polynomial_max_deriv(
     key: random.PRNGKey,
@@ -144,9 +162,13 @@ vmap_random_monotonic_convex_polynomial = vmap(
 )
 vmap_evaluate_polynomial = vmap(evaluate_polynomial, in_axes=(0, None))
 
-# =============================================================================
-# Piecewise Linear Derivative Thickness Generation (Copied from user input)
-# =============================================================================
+# -------------------------------------------------------------
+# ================= ↑ polynomial thicknesses ↑ ================
+# -------------------------------------------------------------
+
+# -------------------------------------------------------------
+# ======== ↓ piecewise linear derivative thicknesses ↓ ========
+# -------------------------------------------------------------
 
 def _generate_and_check_params_nondecreasing(key, xmin, xmax, eps, max_derivative):
     """Generates PWL parameters and checks constraints."""
@@ -222,22 +244,22 @@ vmap_generate_pwl_params = jax.vmap(
 )
 vmap_evaluate_pwl = vmap(evaluate_pwl_single_from_params, in_axes=(0, None))
 
-# =============================================================================
-# Forward Model Setup (Copied and adapted from user input)
-# =============================================================================
+# -------------------------------------------------------------
+# ======== ↑ piecewise linear derivative thicknesses ↑ ========
+# -------------------------------------------------------------
+
+# -------------------------------------------------------------
+# ===================== ↓ simulator setup ↓ ===================
+# -------------------------------------------------------------
 
 def setup_forward_model() -> Tuple[Callable, SetupParams, OpticsParams, LayerParams, LayerParams, int]:
     """Sets up the reflax forward model parameters and returns a callable function."""
-    if not REFLAX_AVAILABLE:
-        print("Skipping forward model setup as reflax is not available.")
-        # Return dummy values or raise an error if needed
-        return None, None, None, None, None, None
 
     print("Setting up Reflax forward model...")
     interference_model = ONE_LAYER_INTERNAL_REFLECTIONS # Or TRANSFER_MATRIX_METHOD
 
     # Setup Parameters
-    wavelength = 632.8  # nm
+    wavelength = 632.8 # nm
     polar_angle = jnp.deg2rad(25)
     azimuthal_angle = jnp.deg2rad(0)
     setup_params = SetupParams(
@@ -252,6 +274,7 @@ def setup_forward_model() -> Tuple[Callable, SetupParams, OpticsParams, LayerPar
     permeability_reflection = 1.0
     permittivity_reflection = complex(1.0, 0.0)  # Air/Vacuum
     permeability_transmission = 1.0
+
     # Example substrate: Silicon (using values from refractiveindex.info at 632.8nm)
     # Make sure these are correct for your actual substrate
     n_substrate = 3.8827
@@ -268,24 +291,19 @@ def setup_forward_model() -> Tuple[Callable, SetupParams, OpticsParams, LayerPar
     )
 
     # Layer Parameters
-    backside_mode = 1 # Coherent reflection from backside (adjust if needed)
+    backside_mode = 1
 
-    # Static layers (e.g., substrate itself if not transmission medium, or buffer layers)
-    # For simplicity, assuming no static layers between variable layer and substrate
     static_layer_thicknesses = jnp.array([0.0]) # Effectively no static layer
-    permeability_static_size_layers = jnp.array([permeability_transmission]) # Match transmission medium
-    permittivity_static_size_layers = jnp.array([permittivity_transmission]) # Match transmission medium
+    permeability_static_size_layers = jnp.array([permeability_transmission])
+    permittivity_static_size_layers = jnp.array([permittivity_transmission])
     static_layer_params = LayerParams(
         permeabilities=permeability_static_size_layers,
         permittivities=permittivity_static_size_layers,
         thicknesses=static_layer_thicknesses
     )
 
-    # Variable layer parameters (the layer whose thickness profile we generate)
-    # Example: SiO2 (using values from refractiveindex.info at 632.8nm)
-    # Make sure these are correct for your growing layer material
     n_variable = 1.457
-    k_variable = 0.0 # Assuming non-absorbing layer, adjust if needed
+    k_variable = 0.0
     permeability_variable_layer = 1.0
     permittivity_variable_layer = (n_variable + 1j * k_variable)**2
     variable_layer_params = LayerParams(
@@ -294,14 +312,10 @@ def setup_forward_model() -> Tuple[Callable, SetupParams, OpticsParams, LayerPar
         thicknesses = None # This will be provided during the call
     )
 
-    # Define the forward model function with fixed parameters
     # @jit
     def forward_model_func(thickness_profile: jnp.ndarray) -> jnp.ndarray:
         """Calculates reflectance for a given thickness profile."""
-        # The model expects thicknesses for *each* time step for *one* layer profile
-        # If the variable layer params define multiple materials, thickness shape needs adjustment
-        # Assuming single material variable layer here.
-        reflectance = reflax_forward_model(
+        reflectance = forward_model(
             model=interference_model,
             setup_params=setup_params,
             optics_params=optics_params,
@@ -317,9 +331,13 @@ def setup_forward_model() -> Tuple[Callable, SetupParams, OpticsParams, LayerPar
     # Return the callable and parameters if needed elsewhere
     return forward_model_func, setup_params, optics_params, static_layer_params, variable_layer_params, backside_mode
 
-# =============================================================================
-# Main Data Generation Logic
-# =============================================================================
+# -------------------------------------------------------------
+# ==================== ↑ simulator setup ↑ ====================
+# -------------------------------------------------------------
+
+# -------------------------------------------------------------
+# ================ ↓ main generation routine ↓ ================
+# -------------------------------------------------------------
 
 def main(args):
     print("Starting training data generation...")
@@ -401,7 +419,7 @@ def main(args):
 
     # --- Calculate Reflectances using Forward Model ---
     reflectances_calculated = False
-    if REFLAX_AVAILABLE and not args.skip_forward_model:
+    if not args.skip_forward_model:
         print("\nCalculating reflectances using forward model...")
         start_time = pytime.time()
         forward_model_func, *_ = setup_forward_model()
@@ -432,6 +450,7 @@ def main(args):
             thicknesses=np.array(combined_thicknesses),
             reflectances=np.array(combined_reflectances),
             x_eval=np.array(x_eval),
+            timepoints=np.array(x_eval),
             n_pol=args.n_pol,
             n_lin=args.n_lin,
             n_const=args.n_const,
@@ -535,3 +554,7 @@ def main(args):
 if __name__ == "__main__":
     args = parse_args()
     main(args)
+
+# -------------------------------------------------------------
+# ================ ↑ main generation routine ↑ ================
+# -------------------------------------------------------------
