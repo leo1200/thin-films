@@ -29,9 +29,10 @@ def snell(n1, n2, theta_incidence):
     Returns:
         Angle of refraction (radians). Handles TIR by returning complex angle.
     """
-    # Ensure inputs are complex if necessary to handle TIR gracefully
-    n1 = jnp.asarray(n1, dtype=jnp.complex64)
-    n2 = jnp.asarray(n2, dtype=jnp.complex64)
+    # Ensure inputs are complex
+    n1 = n1 + 0j
+    n2 = n2 + 0j
+    
     theta_incidence = jnp.asarray(theta_incidence, dtype=jnp.complex64)
 
     # Prevent argument to arcsin from exceeding 1 for real cases due to precision
@@ -48,22 +49,20 @@ def snell(n1, n2, theta_incidence):
 def fresnel_transmission_s(n, theta_incidence):
     """Calculates Fresnel transmission coefficient for s-polarization (TE)."""
     # n = n2 / n1
-    n = jnp.asarray(n, dtype=jnp.complex64)
-    theta_incidence = jnp.asarray(theta_incidence, dtype=jnp.complex64)
+    n = n + 0j
     cos_theta_i = jnp.cos(theta_incidence)
     sin_theta_i_sq = jnp.sin(theta_incidence)**2
-    sqrt_term = jnp.sqrt(n**2 - sin_theta_i_sq) # Should handle complex n automatically
+    sqrt_term = jnp.sqrt(n**2 - sin_theta_i_sq)
     return (2 * cos_theta_i) / (cos_theta_i + sqrt_term)
 
 @jit
 def fresnel_transmission_p(n, theta_incidence):
     """Calculates Fresnel transmission coefficient for p-polarization (TM)."""
     # n = n2 / n1
-    n = jnp.asarray(n, dtype=jnp.complex64)
-    theta_incidence = jnp.asarray(theta_incidence, dtype=jnp.complex64)
+    n = n + 0j
     cos_theta_i = jnp.cos(theta_incidence)
     sin_theta_i_sq = jnp.sin(theta_incidence)**2
-    sqrt_term = jnp.sqrt(n**2 - sin_theta_i_sq) # Should handle complex n automatically
+    sqrt_term = jnp.sqrt(n**2 - sin_theta_i_sq)
     return (2 * n * cos_theta_i) / (n**2 * cos_theta_i + sqrt_term)
 
 
@@ -78,8 +77,6 @@ def fresnel_reflection_s(n_rel, theta_incidence):
     Returns:
         Complex reflection coefficient rs.
     """
-    n_rel = jnp.asarray(n_rel, dtype=jnp.complex64)
-    theta_incidence = jnp.asarray(theta_incidence, dtype=jnp.complex64)
 
     cos_theta_i = jnp.cos(theta_incidence)
     sin_theta_i_sq = jnp.sin(theta_incidence)**2
@@ -106,8 +103,6 @@ def fresnel_reflection_p(n_rel, theta_incidence):
     Returns:
         Complex reflection coefficient rp.
     """
-    n_rel = jnp.asarray(n_rel, dtype=jnp.complex64)
-    theta_incidence = jnp.asarray(theta_incidence, dtype=jnp.complex64)
 
     cos_theta_i = jnp.cos(theta_incidence)
     sin_theta_i_sq = jnp.sin(theta_incidence)**2
@@ -135,12 +130,14 @@ def calculate_reflection_coeff(n1, n2, theta_incidence, polarization_state):
     Returns:
         Complex Fresnel reflection coefficient (rs or rp).
     """
-    n1 = jnp.asarray(n1, dtype=jnp.complex64)
-    n2 = jnp.asarray(n2, dtype=jnp.complex64)
+    # ensure inputs are complex
+    n1 = n1 + 0j
+    n2 = n2 + 0j
+
+    # calculate relative refractive index
     n_rel = n2 / n1
 
-    # Since polarization_state is static, Python if/else works fine with JIT.
-    # Using lax.cond is also an option but slightly more verbose here.
+    # calculate reflection coefficient based on polarization state
     if polarization_state == S_POLARIZED:
         return fresnel_reflection_s(n_rel, theta_incidence)
     elif polarization_state == P_POLARIZED:

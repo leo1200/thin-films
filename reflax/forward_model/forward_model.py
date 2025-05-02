@@ -8,7 +8,7 @@ from typing import Tuple
 from jaxtyping import Array, Float
 
 # reflax parameter classes
-from reflax.constants import MIN_MAX_NORMALIZATION, ONE_LAYER_INTERNAL_REFLECTIONS, ONE_LAYER_NO_INTERNAL_REFLECTIONS, S_POLARIZED, TRANSFER_MATRIX_METHOD
+from reflax.constants import MIN_MAX_NORMALIZATION, ONE_LAYER_INTERNAL_REFLECTIONS, S_POLARIZED, TRANSFER_MATRIX_METHOD
 from reflax.parameter_classes.parameters import (
     LayerParams,
     OpticsParams,
@@ -16,9 +16,8 @@ from reflax.parameter_classes.parameters import (
 )
 
 # reflax interference models
-from reflax._reflectance_models.baseline_methods import (
-    one_layer_internal_reflections,
-    one_layer_no_internal_reflections
+from reflax._reflectance_models.one_layer_model import (
+    one_layer_model,
 )
 from reflax._reflectance_models import transfer_matrix_method
 
@@ -41,22 +40,12 @@ def forward_model(
     consider the variable layer
     """
 
-    if model == ONE_LAYER_NO_INTERNAL_REFLECTIONS:
+
+    if model == ONE_LAYER_INTERNAL_REFLECTIONS:
         variable_layer_params = variable_layer_params._replace(
             thicknesses = variable_layer_thicknesses
         )
-        out = one_layer_no_internal_reflections(
-            setup_params = setup_params,
-            optics_params = optics_params,
-            layer_params = variable_layer_params,
-            polarization_state = polarization_state
-        )
-    
-    elif model == ONE_LAYER_INTERNAL_REFLECTIONS:
-        variable_layer_params = variable_layer_params._replace(
-            thicknesses = variable_layer_thicknesses
-        )
-        out = one_layer_internal_reflections(
+        out = one_layer_model(
             setup_params = setup_params,
             optics_params = optics_params,
             layer_params = variable_layer_params,

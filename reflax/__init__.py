@@ -3,7 +3,6 @@ from reflax.parameter_classes import SetupParams, OpticsParams, LayerParams
 
 # constants
 from reflax.constants import (
-    ONE_LAYER_NO_INTERNAL_REFLECTIONS,
     ONE_LAYER_INTERNAL_REFLECTIONS,
     TRANSFER_MATRIX_METHOD,
     S_POLARIZED,

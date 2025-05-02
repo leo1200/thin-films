@@ -1,8 +1,5 @@
 # reflax - Differentiable Interference Modeling for Cost-Effective Growth Estimation of Thin Films
 
-> [!NOTE]  
-> This is work in progress. A current presentation can be found under [resources/reflax.pdf](resources/reflax.pdf).
-
 ## Challenges in Current Thin Film Growth Measurement Techniques
 
 For measuring the growth behavior of thin films, in our case from Initiated Chemical Vapor Deposition (iCVD), the following methods can e.g. be applied:

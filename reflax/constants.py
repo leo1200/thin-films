@@ -1,8 +1,5 @@
 # models
 
-#: one layer model with no internal reflections
-ONE_LAYER_NO_INTERNAL_REFLECTIONS = 0
-
 #: one layer model with internal reflections
 ONE_LAYER_INTERNAL_REFLECTIONS = 1
 

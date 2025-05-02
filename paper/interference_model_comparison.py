@@ -31,7 +31,6 @@ from reflax.parameter_classes.parameters import (
 
 # constants
 from reflax import (
-    ONE_LAYER_NO_INTERNAL_REFLECTIONS,
     ONE_LAYER_INTERNAL_REFLECTIONS,
     TRANSFER_MATRIX_METHOD,
     S_POLARIZED,
@@ -122,18 +121,6 @@ variable_layer_thicknesses = time * growth_rate
 # nomalization
 normalization = NO_NORMALIZATION
 
-reflectanceI = forward_model(
-    model = ONE_LAYER_NO_INTERNAL_REFLECTIONS,
-    setup_params = setup_params,
-    optics_params = optics_params,
-    static_layer_params = static_layer_params,
-    variable_layer_params = variable_layer_params,
-    variable_layer_thicknesses = variable_layer_thicknesses,
-    backside_mode = backside_mode,
-    polarization_state = polarization_state,
-    normalization = normalization
-)
-
 reflectanceII = forward_model(
     model = ONE_LAYER_INTERNAL_REFLECTIONS,
     setup_params = setup_params,
@@ -168,9 +155,9 @@ reflectanceTMM = forward_model(
 # -------------------------------------------------------------
 
 fig, ax = plt.subplots(1, 1, figsize=(10, 5))
-ax.plot(time, reflectanceI, label = "one layer, no internal reflections")
-ax.plot(time, reflectanceII, label = "one layer, with internal reflections")
-ax.plot(time, reflectanceTMM, label = "transfer matrix method")
+ax.plot(time, reflectanceII, "b--", label = "one layer, with internal reflections", alpha = 0.5)
+ax.plot(time, reflectanceTMM, "r--", label = "transfer matrix method", alpha = 0.5)
+# ax.plot(time, reflectanceTMM, label = "transfer matrix method")
 ax.set_xlabel("time in hours")
 ax.set_ylabel("reflectance")
 ax.set_title("model comparison for linear thin-film growth")
