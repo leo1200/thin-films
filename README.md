@@ -30,17 +30,17 @@ This is implemented in [analysis/estimate_growth.py](analysis/estimate_growth.py
 
 Below, the measurement setup is illustrated.
 
-| ![Model Overview](model.png) |
+| ![Model Overview](resources/model.png) |
 |:----------------------------:|
 | Model Overview               |
 
 Below, experimental and validation results are shown.
 
-| ![Analysis of Real-World Measurement](analysis.svg) |
+| ![Analysis of Real-World Measurement](resources/analysis.svg) |
 |:---------------------------------------------------:|
 | Analysis of a Real-World Measurement                |
 
-| ![Validation on a Given Thickness Profile](validation.svg) |
+| ![Validation on a Given Thickness Profile](resources/validation.svg) |
 |:----------------------------------------------------------:|
 | Validation on a Given Thickness Profile                    |
 
