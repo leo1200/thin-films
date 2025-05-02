@@ -175,7 +175,7 @@ def transfer_matrix_method(
     atm = jnp.cross(ate, kinc)
     atm /= jnp.linalg.norm(atm)
     
-    P = optics_params.transverse_electric_component * ate + optics_params.transverse_magnetic_component * atm
+    P = optics_params.s_component * ate + optics_params.p_component * atm
     P /= jnp.linalg.norm(P)
 
     # Reflected and transmitted fields

@@ -5,14 +5,16 @@ from functools import partial
 from typing import Tuple
 import jax.lax as lax
 
-from reflax.reflactance_models.basic_optics import calculate_reflection_coeff, snell
+from reflax._reflectance_models.basic_optics import calculate_reflection_coeff, snell
+from reflax.constants import S_POLARIZED
 from reflax.parameter_classes.parameters import LayerParams, OpticsParams, SetupParams
 
-@jax.jit
+@partial(jax.jit, static_argnames=['polarization_state'])
 def one_layer_no_internal_reflections(
     setup_params: SetupParams,
     optics_params: OpticsParams,
     layer_params: LayerParams,
+    polarization_state: int = S_POLARIZED,
 ) -> Tuple[float, float, float]:
     """
     xxx
@@ -26,18 +28,19 @@ def one_layer_no_internal_reflections(
     delta = 2 * jnp.pi * layer_params.thicknesses * jnp.sqrt(n1 ** 2 - n0 ** 2 * jnp.sin(setup_params.polar_angle) ** 2) / setup_params.wavelength
     theta_transmitted = snell(n0, n1, setup_params.polar_angle)
 
-    r01 = calculate_reflection_coeff(n0, n1, setup_params.polar_angle, setup_params.polstate)
-    r12 = calculate_reflection_coeff(n1, n2, theta_transmitted, setup_params.polstate)
+    r01 = calculate_reflection_coeff(n0, n1, setup_params.polar_angle, polarization_state)
+    r12 = calculate_reflection_coeff(n1, n2, theta_transmitted, polarization_state)
 
     # return jnp.cos(delta) ** 2
     return jnp.abs(r01 + (1 - r01 ** 2) * r12 * jnp.exp(2j * delta)) ** 2
 
 
-@jax.jit
+@partial(jax.jit, static_argnames=['polarization_state'])
 def one_layer_internal_reflections(
     setup_params: SetupParams,
     optics_params: OpticsParams,
     layer_params: LayerParams,
+    polarization_state: int = S_POLARIZED,
 ) -> float:
     """
     xxx
@@ -51,9 +54,9 @@ def one_layer_internal_reflections(
 
     theta_transmitted = snell(n0, n1, setup_params.polar_angle)
 
-    r01 = calculate_reflection_coeff(n0, n1, setup_params.polar_angle, setup_params.polstate)
-    r12 = calculate_reflection_coeff(n1, n2, theta_transmitted, setup_params.polstate)
-    r10 = -calculate_reflection_coeff(n0, n1, theta_transmitted, setup_params.polstate)
+    r01 = calculate_reflection_coeff(n0, n1, setup_params.polar_angle, polarization_state)
+    r12 = calculate_reflection_coeff(n1, n2, theta_transmitted, polarization_state)
+    r10 = -calculate_reflection_coeff(n0, n1, theta_transmitted, polarization_state)
 
     return jnp.abs((r01 + r12 * jnp.exp(2j * delta)) / (1 - r10 * r12 * jnp.exp(2j * delta))) ** 2
 

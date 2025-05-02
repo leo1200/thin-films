@@ -38,7 +38,7 @@ from sklearn.model_selection import train_test_split
 try:
     from reflax import polanalyze
     from reflax.parameter_classes.parameters import OpticsParams, SetupParams, LayerParams
-    from reflax.forward_model.variable_layer_size import (
+    from reflax.forward_model.forward_model import (
         MIN_MAX_NORMALIZATION, ONE_LAYER_INTERNAL_REFLECTIONS, forward_model
     )
     REFLAX_AVAILABLE = True
@@ -182,7 +182,7 @@ def setup_simulator_params():
         wavelength=wavelength, polar_angle=polar_angle, azimuthal_angle=azimuthal_angle
     )
     polarization_state = "Linear TE/perpendicular/s"
-    transverse_electric_component, transverse_magnetic_component = polanalyze(polarization_state)
+    s_component, p_component = polanalyze(polarization_state)
     permeability_reflection = 1.0
     permittivity_reflection = complex(1.0, 0.0)
     permeability_transmission = 1.0
@@ -192,7 +192,7 @@ def setup_simulator_params():
     optics_params = OpticsParams(
         permeability_reflection=permeability_reflection, permittivity_reflection=permittivity_reflection,
         permeability_transmission=permeability_transmission, permittivity_transmission=permittivity_transmission,
-        transverse_electric_component=transverse_electric_component, transverse_magnetic_component=transverse_magnetic_component
+        s_component=s_component, p_component=p_component
     )
     backside_mode = 1
     static_layer_thicknesses = jnp.array([0.0])

@@ -38,12 +38,12 @@ try:
         SetupParams,
         LayerParams
     )
-    from reflax.forward_model.variable_layer_size import (
+    from reflax.forward_model.forward_model import (
         MIN_MAX_NORMALIZATION,
         ONE_LAYER_INTERNAL_REFLECTIONS,
         TRANSFER_MATRIX_METHOD
     )
-    from reflax.forward_model.variable_layer_size import forward_model
+    from reflax.forward_model.forward_model import forward_model
     REFLAX_AVAILABLE = True
 except ImportError:
     print("WARNING: Reflax library not found. Reflectance calculation will be skipped.")
@@ -452,7 +452,7 @@ def setup_forward_model() -> Tuple[Optional[Callable], Optional[SetupParams], Op
 
     # --- Optics Parameters ---
     polarization_state = "Linear TE/perpendicular/s" # Common choice, alternatives: "Linear TM/parallel/p", "Linear +45", "RCP", "LCP"
-    transverse_electric_component, transverse_magnetic_component = polanalyze(polarization_state)
+    s_component, p_component = polanalyze(polarization_state)
     # Reflection medium (typically air or vacuum)
     permeability_reflection = 1.0
     permittivity_reflection = complex(1.0, 0.0)
@@ -469,8 +469,8 @@ def setup_forward_model() -> Tuple[Optional[Callable], Optional[SetupParams], Op
         permittivity_reflection=permittivity_reflection,
         permeability_transmission=permeability_transmission,
         permittivity_transmission=permittivity_transmission,
-        transverse_electric_component=transverse_electric_component,
-        transverse_magnetic_component=transverse_magnetic_component
+        s_component=s_component,
+        p_component=p_component
     )
 
     # --- Layer Parameters ---

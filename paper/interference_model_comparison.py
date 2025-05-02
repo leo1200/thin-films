@@ -9,15 +9,18 @@ The models compared will be:
 """
 
 # ==== GPU selection ====
-from autocvd import autocvd
-autocvd(num_gpus = 1)
+# from autocvd import autocvd
+
+# from reflax.constants import S_POLARIZED
+# autocvd(num_gpus = 1)
+# only use gpu 9
+import os
+os.environ["CUDA_VISIBLE_DEVICES"] = "9"
 # =======================
 
 import jax.numpy as jnp
 
 import matplotlib.pyplot as plt
-
-from reflax.reflactance_models.basic_optics import polanalyze
 
 # simulator setup
 from reflax.parameter_classes.parameters import (
@@ -26,34 +29,41 @@ from reflax.parameter_classes.parameters import (
     SetupParams
 )
 
-# different interference models
-from reflax.forward_model.variable_layer_size import (
+# constants
+from reflax import (
     ONE_LAYER_NO_INTERNAL_REFLECTIONS,
     ONE_LAYER_INTERNAL_REFLECTIONS,
     TRANSFER_MATRIX_METHOD,
-    forward_model
-)
-
-# normalization of the model output
-from reflax.forward_model.variable_layer_size import (
+    S_POLARIZED,
     NO_NORMALIZATION,
     MIN_MAX_NORMALIZATION
 )
+
+# forward model
+from reflax import (
+    forward_model
+)
+
+from reflax._reflectance_models.basic_optics import get_polarization_components
+
 
 # -------------------------------------------------------------
 # ===================== ↓ Simulator Setup ↓ ===================
 # -------------------------------------------------------------
 
+wavelength = 632.8
+
 polar_angle = jnp.deg2rad(75)
 azimuthal_angle = jnp.deg2rad(0)
 
-setup_params = SetupParams(
-    polar_angle = polar_angle,
-    azimuthal_angle = azimuthal_angle
-)
+polarization_state = S_POLARIZED
+s_component, p_component = get_polarization_components(polarization_state)
 
-polarization_state = "Linear TE/perpendicular/s"
-transverse_electric_component, transverse_magnetic_component = polanalyze(polarization_state)
+setup_params = SetupParams(
+    wavelength = wavelength,
+    polar_angle = polar_angle,
+    azimuthal_angle = azimuthal_angle,
+)
 
 permeability_reflection = 1
 permittivity_reflection = 1
@@ -66,8 +76,8 @@ optics_params = OpticsParams(
     permittivity_reflection = permittivity_reflection,
     permeability_transmission = permeability_transmission,
     permittivity_transmission = permittivity_transmission,
-    transverse_electric_component = transverse_electric_component,
-    transverse_magnetic_component = transverse_magnetic_component
+    s_component = s_component,
+    p_component = p_component
 )
 
 backside_mode = 1
@@ -120,6 +130,7 @@ reflectanceI = forward_model(
     variable_layer_params = variable_layer_params,
     variable_layer_thicknesses = variable_layer_thicknesses,
     backside_mode = backside_mode,
+    polarization_state = polarization_state,
     normalization = normalization
 )
 
@@ -131,6 +142,7 @@ reflectanceII = forward_model(
     variable_layer_params = variable_layer_params,
     variable_layer_thicknesses = variable_layer_thicknesses,
     backside_mode = backside_mode,
+    polarization_state = polarization_state,
     normalization = normalization
 )
 
@@ -142,6 +154,7 @@ reflectanceTMM = forward_model(
     variable_layer_params = variable_layer_params,
     variable_layer_thicknesses = variable_layer_thicknesses,
     backside_mode = backside_mode,
+    polarization_state = polarization_state,
     normalization = normalization
 )
 

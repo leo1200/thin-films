@@ -6,8 +6,7 @@ import jax.numpy as jnp
 
 from typing import NamedTuple
 
-# pytree-objects via eqx.Module
-import equinox as eqx
+from reflax.constants import S_POLARIZED
 
 # types compatible with tracing
 FloatScalar = float | Float[Array, ""]
@@ -27,28 +26,25 @@ class SetupParams(NamedTuple):
     #: Azimuthal angle in radians.
     azimuthal_angle: FloatScalar = jnp.deg2rad(0)
 
-    #: Polarization state.
-    polstate: int = 0
-
 class OpticsParams(NamedTuple):
     """
     TODO: write class description
     """
 
     #: TE polarized component.
-    transverse_electric_component: FloatScalar = 1.0
+    s_component: FloatScalar = 1.0
 
     #: TM polarized component.
-    transverse_magnetic_component: FloatScalar = 0.0
+    p_component: FloatScalar = 0.0
 
     #: Relative permeability (reflection side).
-    permeability_reflection: FloatScalar = 1
+    permeability_reflection: FloatScalar = 1.0
 
     #: Relative permittivity (reflection side).
-    permittivity_reflection: FloatScalar = 1
+    permittivity_reflection: FloatScalar = 1.0
 
     #: Relative permeability (transmission side).
-    permeability_transmission: FloatScalar = 1
+    permeability_transmission: FloatScalar = 1.0
 
     #: Relative permittivity (transmission side).
     permittivity_transmission: FloatScalar = (3.8827 + 0.019626j)**2
@@ -66,17 +62,3 @@ class LayerParams(NamedTuple):
 
     #: Layer permittivities
     permittivities: FloatScalarList = 0.0
-
-class GrowthModel(NamedTuple):
-    """
-    TODO: write class description
-    """
-
-    #: initial thickness
-    initial_thickness: FloatScalar = 0.0
-
-    #: growth velocity
-    growth_velocity: FloatScalar = 0.0
-
-    #: growth acceleration
-    growth_acceleration: FloatScalar = 0.0
