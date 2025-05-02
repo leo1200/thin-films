@@ -21,7 +21,7 @@ Note that t0 is assumed to be zero.
 import math
 import jax
 import jax.numpy as jnp
-from reflax._helpers.helpers import polanalyze
+from reflax.reflactance_models.basic_optics import polanalyze
 from reflax.data_analysis.chirpgp.models import jndarray, model_chirp, disc_chirp_lcd, disc_chirp_lcd_cond_v, disc_m32
 from reflax.data_analysis.chirpgp.tools import simulate_sde, simulate_function_parametrised_sde
 from functools import partial
