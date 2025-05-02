@@ -71,10 +71,10 @@ def parse_args():
 
     # --- Profile Shape Parameters ---
     parser.add_argument('--poly_base_degree', type=int, default=3, help='Base degree for random polynomial p(x) (H(x) will have degree + 2)')
-    parser.add_argument('--poly_min_deriv', type=float, default=0.1, help='Min derivative constraint for polynomial H\'(x) [where H(1)=1]')
-    parser.add_argument('--poly_max_deriv', type=float, default=1.2, help='Max derivative constraint for polynomial H\'(x) [where H(1)=1]')
-    parser.add_argument('--pwl_min_deriv', type=float, default=0.1, help='Min derivative constraint for PWL H\'(x) [where H(1)=1]')
-    parser.add_argument('--pwl_max_deriv', type=float, default=1.2, help='Max derivative constraint for PWL H\'(x) [where H(1)=1]')
+    parser.add_argument('--poly_min_deriv', type=float, default=0.2, help='Min derivative constraint for polynomial H\'(x) [where H(1)=1]')
+    parser.add_argument('--poly_max_deriv', type=float, default=1.8, help='Max derivative constraint for polynomial H\'(x) [where H(1)=1]')
+    parser.add_argument('--pwl_min_deriv', type=float, default=0.2, help='Min derivative constraint for PWL H\'(x) [where H(1)=1]')
+    parser.add_argument('--pwl_max_deriv', type=float, default=1.8, help='Max derivative constraint for PWL H\'(x) [where H(1)=1]')
 
     # --- Output Files ---
     parser.add_argument('--output_file', type=str, default='training_data.npz', help='Output file name for saved data array')
