@@ -1,1 +1,1 @@
-from reflax._reflectance_models.transfer_matrix_method import transfer_matrix_method
+from reflax._reflectance_models._transfer_matrix_method import transfer_matrix_method

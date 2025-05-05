@@ -1,12 +1,14 @@
 """
-Here we will compare the different models of interference.
+The frequency of the reflectance signal scales with
+2 pi d / \lambda * sqrt(n_1 ^ 2 - n_0 ^ 2 * sin^2(theta))
+where n_0 is the refractive index of the incident medium
+and n_1 is the refractive index of the thin film.
 
-The models compared will be:
- - one layer, no internal reflections
- - one layer, with internal reflections
- - multi-layer transfer matrix method
+define v_tilde = v * sqrt(n_1 ^ 2 - n_0 ^ 2 * sin^2(theta))
 
 """
+
+v_tilde = 1000.0
 
 # ==== GPU selection ====
 # from autocvd import autocvd
@@ -53,7 +55,7 @@ from reflax import get_polarization_components
 
 wavelength = 632.8
 
-polar_angle = jnp.deg2rad(75)
+polar_angle = jnp.deg2rad(25)
 azimuthal_angle = jnp.deg2rad(0)
 
 polarization_state = S_POLARIZED
@@ -78,6 +80,8 @@ incident_medium_params = IncidentMediumParams(
     permittivity_reflection = permittivity_reflection
 )
 
+n_incident = jnp.sqrt(incident_medium_params.permittivity_reflection * incident_medium_params.permeability_reflection)
+
 permeability_transmission = 1.0
 permittivity_transmission = (3.8827 + 0.019626j)**2
 
@@ -88,26 +92,26 @@ transmission_medium_params = TransmissionMediumParams(
 
 backside_mode = 1
 
-
-static_layer_paramsA = LayerParams(
+static_layer_params = LayerParams(
     permeabilities = jnp.array([1.0]),
     permittivities = jnp.array([1.457**2]),
     thicknesses = jnp.array([0.0])
 )
 
-static_layer_paramsB = LayerParams(
-    permeabilities = jnp.array([1.0, 1.0]),
-    permittivities = jnp.array([1.5**2, 1.6**2]),
-    thicknesses = jnp.array([100.0, 50.0])
+n_variable_A = 1.5
+v_A = v_tilde / jnp.sqrt(n_variable_A**2 - n_incident**2 * jnp.sin(polar_angle)**2)
+
+variable_layer_paramsA = LayerParams(
+    permeabilities = 1.0,
+    permittivities = n_variable_A**2,
 )
 
-n_variable = 1.457
-k_variable = 0.0
-permeability_variable_layer = 1.0
-permittivity_variable_layer = (n_variable + 1j * k_variable)**2
-variable_layer_params = LayerParams(
-    permeabilities = permeability_variable_layer,
-    permittivities = permittivity_variable_layer,
+n_variable_B = 1.25
+v_B = v_tilde / jnp.sqrt(n_variable_B**2 - n_incident**2 * jnp.sin(polar_angle)**2)
+
+variable_layer_paramsB = LayerParams(
+    permeabilities = 1.0,
+    permittivities = n_variable_B**2,
 )
 
 # -------------------------------------------------------------
@@ -122,52 +126,36 @@ variable_layer_params = LayerParams(
 # one hour of data
 time = jnp.linspace(0, 1, 1000)
 
-# assume a linear growth of 1000 nm / hour
-growth_rate = 1000
-
 # calculate the thickness of the variable layer
-variable_layer_thicknesses = time * growth_rate
+variable_layer_thicknessesA = time * v_A
+variable_layer_thicknessesB = time * v_B
 
 # nomalization
 normalization = NO_NORMALIZATION
 
-reflectanceII_A = forward_model(
+reflectanceA = forward_model(
     model = ONE_LAYER_MODEL,
     setup_params = setup_params,
     light_source_params = light_source_params,
     incident_medium_params = incident_medium_params,
     transmission_medium_params = transmission_medium_params,
-    static_layer_params = static_layer_paramsA,
-    variable_layer_params = variable_layer_params,
-    variable_layer_thicknesses = variable_layer_thicknesses,
+    static_layer_params = static_layer_params,
+    variable_layer_params = variable_layer_paramsA,
+    variable_layer_thicknesses = variable_layer_thicknessesA,
     backside_mode = backside_mode,
     polarization_state = polarization_state,
     normalization = normalization
 )
 
-reflectanceTMM_A = forward_model(
-    model = TRANSFER_MATRIX_METHOD,
+reflectanceB = forward_model(
+    model = ONE_LAYER_MODEL,
     setup_params = setup_params,
     light_source_params = light_source_params,
     incident_medium_params = incident_medium_params,
     transmission_medium_params = transmission_medium_params,
-    static_layer_params = static_layer_paramsA,
-    variable_layer_params = variable_layer_params,
-    variable_layer_thicknesses = variable_layer_thicknesses,
-    backside_mode = backside_mode,
-    polarization_state = polarization_state,
-    normalization = normalization
-)
-
-reflectanceTMM_B = forward_model(
-    model = TRANSFER_MATRIX_METHOD,
-    setup_params = setup_params,
-    light_source_params = light_source_params,
-    incident_medium_params = incident_medium_params,
-    transmission_medium_params = transmission_medium_params,
-    static_layer_params = static_layer_paramsB,
-    variable_layer_params = variable_layer_params,
-    variable_layer_thicknesses = variable_layer_thicknesses,
+    static_layer_params = static_layer_params,
+    variable_layer_params = variable_layer_paramsB,
+    variable_layer_thicknesses = variable_layer_thicknessesB,
     backside_mode = backside_mode,
     polarization_state = polarization_state,
     normalization = normalization
@@ -182,25 +170,16 @@ reflectanceTMM_B = forward_model(
 # ======================== ↓ plotting ↓ =======================
 # -------------------------------------------------------------
 
-fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(10, 5))
+fig, ax1 = plt.subplots(1, 1, figsize=(5, 5))
 
-ax1.plot(time, reflectanceII_A, "b--", label = "one layer, with internal reflections", alpha = 0.5)
-ax1.plot(time, reflectanceTMM_A, "r--", label = "transfer matrix method", alpha = 0.5)
+ax1.plot(time, reflectanceA, "b--", label = "n = {}, v = {} nm/h".format(n_variable_A, v_A))
+ax1.plot(time, reflectanceB, "r--", label = "n = {}, v = {} nm/h".format(n_variable_B, v_B))
 ax1.set_xlabel("time in hours")
 ax1.set_ylabel("reflectance")
-ax1.set_title("single growing layer")
+ax1.set_title("degeneracy test")
 ax1.legend(loc="upper right")
-ax1.set_ylim(0, 1)
 
-ax2.plot(time, reflectanceTMM_B, "r--", label = "transfer matrix method", alpha = 0.5)
-ax2.set_xlabel("time in hours")
-ax2.set_ylabel("reflectance")
-ax2.set_title("three layers, one growing")
-ax2.legend(loc="upper right")
-ax2.set_ylim(0, 1)
-
-plt.tight_layout()
-plt.savefig("figures/interference_model_comparison.svg")
+plt.savefig("figures/degeneracy_test.svg")
 
 # -------------------------------------------------------------
 # ======================== ↑ plotting ↑ =======================

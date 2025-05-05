@@ -17,19 +17,16 @@ class SetupParams(NamedTuple):
     TODO: write class description
     """
 
-    #: Free-space wavelength.
-    wavelength: FloatScalar = 632.8
-
     #: Polar/zenith angle in radians.
     polar_angle: FloatScalar = jnp.deg2rad(25)
 
     #: Azimuthal angle in radians.
     azimuthal_angle: FloatScalar = jnp.deg2rad(0)
 
-class OpticsParams(NamedTuple):
-    """
-    TODO: write class description
-    """
+class LightSourceParams(NamedTuple):
+    
+    #: Wavelength in nm.
+    wavelength: FloatScalar = 632.8
 
     #: TE polarized component.
     s_component: FloatScalar = 1.0
@@ -37,11 +34,17 @@ class OpticsParams(NamedTuple):
     #: TM polarized component.
     p_component: FloatScalar = 0.0
 
+class IncidentMediumParams(NamedTuple):
+    """Medium the light is coming from."""
+
     #: Relative permeability (reflection side).
     permeability_reflection: FloatScalar = 1.0
 
     #: Relative permittivity (reflection side).
     permittivity_reflection: FloatScalar = 1.0
+
+class TransmissionMediumParams(NamedTuple):
+    """Medium the light enters after passing through the layers (subsrate)."""
 
     #: Relative permeability (transmission side).
     permeability_transmission: FloatScalar = 1.0

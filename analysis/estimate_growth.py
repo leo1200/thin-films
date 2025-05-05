@@ -25,7 +25,7 @@ from reflax.parameter_classes.parameters import (
 )
 from reflax.forward_model.forward_model import (
     MIN_MAX_NORMALIZATION,
-    ONE_LAYER_INTERNAL_REFLECTIONS,
+    ONE_LAYER_MODEL,
     TRANSFER_MATRIX_METHOD
 )
 from reflax.forward_model.forward_model import forward_model
@@ -37,7 +37,7 @@ import matplotlib.pyplot as plt
 # ======================== ↓ settings ↓ =======================
 # -------------------------------------------------------------
 
-interference_model = ONE_LAYER_INTERNAL_REFLECTIONS
+interference_model = ONE_LAYER_MODEL
 use_simulated_data = True
 
 if use_simulated_data:

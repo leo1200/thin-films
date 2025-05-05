@@ -39,7 +39,7 @@ try:
     from reflax import polanalyze
     from reflax.parameter_classes.parameters import OpticsParams, SetupParams, LayerParams
     from reflax.forward_model.forward_model import (
-        MIN_MAX_NORMALIZATION, ONE_LAYER_INTERNAL_REFLECTIONS, forward_model
+        MIN_MAX_NORMALIZATION, ONE_LAYER_MODEL, forward_model
     )
     REFLAX_AVAILABLE = True
     # --- Define simulator params globally after import ---
@@ -174,7 +174,7 @@ def setup_simulator_params():
         return None, None, None, None, None, None, None # Added one None for normalization
 
     print("Setting up Reflax simulator parameters...")
-    interference_model = ONE_LAYER_INTERNAL_REFLECTIONS
+    interference_model = ONE_LAYER_MODEL
     wavelength = 632.8
     polar_angle = jnp.deg2rad(25)
     azimuthal_angle = jnp.deg2rad(0)

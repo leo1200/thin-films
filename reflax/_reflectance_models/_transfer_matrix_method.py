@@ -18,12 +18,14 @@ from reflax._matrix_operations import (
     setS11,
     setS12
 )
-from reflax.parameter_classes.parameters import LayerParams, OpticsParams, SetupParams
+from reflax.parameter_classes.parameters import IncidentMediumParams, LayerParams, LightSourceParams, SetupParams, TransmissionMediumParams
 
 @partial(jax.jit, static_argnames=['backside_mode'])
 def transfer_matrix_method(
     setup_params: SetupParams,
-    optics_params: OpticsParams,
+    light_source_params: LightSourceParams,
+    incident_medium_params: IncidentMediumParams,
+    transmission_medium_params: TransmissionMediumParams,
     layer_params: LayerParams,
     backside_mode: int
 ) -> Tuple[float, float, float]:
@@ -45,11 +47,11 @@ def transfer_matrix_method(
     zeros22 = jnp.zeros((2, 2), dtype = type)
 
     # Refractive indices of external regions
-    nref = jnp.sqrt(optics_params.permeability_reflection * optics_params.permittivity_reflection)
-    ntrn = jnp.sqrt(optics_params.permeability_transmission * optics_params.permittivity_transmission)
+    nref = jnp.sqrt(incident_medium_params.permeability_reflection * incident_medium_params.permittivity_reflection)
+    ntrn = jnp.sqrt(transmission_medium_params.permeability_transmission * transmission_medium_params.permittivity_transmission)
 
     # Calculate wave vector components
-    k0 = 2 * jnp.pi / setup_params.wavelength
+    k0 = 2 * jnp.pi / light_source_params.wavelength
     # Compute normalized wavevector
     kinc = nref * jnp.array([jnp.sin(setup_params.polar_angle) * jnp.cos(setup_params.azimuthal_angle), jnp.sin(setup_params.polar_angle) * jnp.sin(setup_params.azimuthal_angle), jnp.cos(setup_params.polar_angle)], dtype = type)
 
@@ -57,8 +59,8 @@ def transfer_matrix_method(
     kx, ky = kinc[0], kinc[1]
 
     # Calculate z-component of wave vector in reflection region
-    kzref = jnp.sqrt(optics_params.permeability_reflection * optics_params.permittivity_reflection - kx**2 - ky**2)
-    kztrn = jnp.sqrt(optics_params.permeability_transmission * optics_params.permittivity_transmission - kx**2 - ky**2)
+    kzref = jnp.sqrt(incident_medium_params.permeability_reflection * incident_medium_params.permittivity_reflection - kx**2 - ky**2)
+    kztrn = jnp.sqrt(transmission_medium_params.permeability_transmission * transmission_medium_params.permittivity_transmission - kx**2 - ky**2)
 
     # Eigen-modes in the gap medium
     Q = jnp.array([[kx * ky, 1 + ky**2], [-1 - kx**2, -kx * ky]], dtype = type)
@@ -108,8 +110,8 @@ def transfer_matrix_method(
     SG, _ = jax.lax.scan(compute_layer, SG, layer_params)
 
     # Reflection region eigen-modes
-    Q = (1 / optics_params.permeability_reflection) * jnp.array([[kx * ky, optics_params.permeability_reflection * optics_params.permittivity_reflection - kx**2],
-                               [ky**2 - optics_params.permeability_reflection * optics_params.permittivity_reflection, -kx * ky]], dtype = type)
+    Q = (1 / incident_medium_params.permeability_reflection) * jnp.array([[kx * ky, incident_medium_params.permeability_reflection * incident_medium_params.permittivity_reflection - kx**2],
+                               [ky**2 - incident_medium_params.permeability_reflection * incident_medium_params.permittivity_reflection, -kx * ky]], dtype = type)
     OMEGA = 1j * kzref * identity22
     Vref = Q @ inverse22(OMEGA)
 
@@ -126,8 +128,8 @@ def transfer_matrix_method(
 
     # Backside transmission/reflection
     if backside_mode == 1:
-        Q = (1 / optics_params.permeability_transmission) * jnp.array([[kx * ky, optics_params.permeability_transmission * optics_params.permittivity_transmission - kx**2],
-                                   [ky**2 - optics_params.permeability_transmission * optics_params.permittivity_transmission, -kx * ky]])
+        Q = (1 / transmission_medium_params.permeability_transmission) * jnp.array([[kx * ky, transmission_medium_params.permeability_transmission * transmission_medium_params.permittivity_transmission - kx**2],
+                                   [ky**2 - transmission_medium_params.permeability_transmission * transmission_medium_params.permittivity_transmission, -kx * ky]])
         OMEGA = 1j * kztrn * identity22
         Vtrn = Q @ inverse22(OMEGA)
         A = identity22 + inverse22(Vg) @ Vtrn
@@ -175,7 +177,7 @@ def transfer_matrix_method(
     atm = jnp.cross(ate, kinc)
     atm /= jnp.linalg.norm(atm)
     
-    P = optics_params.s_component * ate + optics_params.p_component * atm
+    P = light_source_params.s_component * ate + light_source_params.p_component * atm
     P /= jnp.linalg.norm(P)
 
     # Reflected and transmitted fields
@@ -192,7 +194,7 @@ def transfer_matrix_method(
     
     # Calculate reflectance and transmittance
     REF = jnp.linalg.norm(Eref)**2
-    TRN = jnp.linalg.norm(Etrn)**2 * jnp.real(optics_params.permeability_reflection / optics_params.permeability_transmission * kztrn / kzref)
+    TRN = jnp.linalg.norm(Etrn)**2 * jnp.real(incident_medium_params.permeability_reflection / transmission_medium_params.permeability_transmission * kztrn / kzref)
     CON = REF + TRN
 
     return REF, TRN, CON

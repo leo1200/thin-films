@@ -40,7 +40,7 @@ try:
     )
     from reflax.forward_model.forward_model import (
         MIN_MAX_NORMALIZATION,
-        ONE_LAYER_INTERNAL_REFLECTIONS,
+        ONE_LAYER_MODEL,
         TRANSFER_MATRIX_METHOD
     )
     from reflax.forward_model.forward_model import forward_model
@@ -438,7 +438,7 @@ def setup_forward_model() -> Tuple[Optional[Callable], Optional[SetupParams], Op
     print("Setting up Reflax forward model...")
     # Choose the interference model appropriate for the setup
     # ONE_LAYER_INTERNAL_REFLECTIONS is often suitable for single growing films on substrates
-    interference_model = ONE_LAYER_INTERNAL_REFLECTIONS # Or TRANSFER_MATRIX_METHOD
+    interference_model = ONE_LAYER_MODEL # Or TRANSFER_MATRIX_METHOD
 
     # --- Setup Parameters ---
     wavelength = 632.8 # nm (HeNe laser)

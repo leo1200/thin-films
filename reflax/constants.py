@@ -1,7 +1,7 @@
 # models
 
 #: one layer model with internal reflections
-ONE_LAYER_INTERNAL_REFLECTIONS = 1
+ONE_LAYER_MODEL = 1
 
 #: transfer matrix method
 TRANSFER_MATRIX_METHOD = 4

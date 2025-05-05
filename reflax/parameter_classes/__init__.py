@@ -1,1 +1,1 @@
-from reflax.parameter_classes.parameters import SetupParams, OpticsParams, LayerParams
+from reflax.parameter_classes.parameters import SetupParams, LayerParams, LightSourceParams, TransmissionMediumParams, IncidentMediumParams
