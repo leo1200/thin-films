@@ -131,12 +131,12 @@ def batched_forward_model(
     transmission_medium_params: TransmissionMediumParams,
     static_layer_params: LayerParams,
     variable_layer_params: LayerParams,
-    variable_layer_thicknesses: Float[Array, "num_time_series, num_timepoints"],
+    variable_layer_thicknesses: Float[Array, "num_time_series num_timepoints"],
     backside_mode: int,
     polarization_state: int = S_POLARIZED,
     normalization: int = MIN_MAX_NORMALIZATION,
     computation_batch_size = 1000
-) -> Float[Array, "num_time_series, num_timepoints"]:
+) -> Float[Array, "num_time_series num_timepoints"]:
     """
     Batched forward model from thickness to reflectance for multiple time series,
     using jax.lax.map with a specified batch size.

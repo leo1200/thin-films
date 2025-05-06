@@ -6,7 +6,7 @@ import jax.numpy as jnp
 
 from typing import NamedTuple
 
-from reflax.constants import S_POLARIZED
+from reflax.constants import MIN_MAX_NORMALIZATION, ONE_LAYER_MODEL, S_POLARIZED
 
 # types compatible with tracing
 FloatScalar = float | Float[Array, ""]
@@ -14,7 +14,7 @@ FloatScalarList = float | Float[Array, ""] | Float[Array, "num_elements"]
 
 class SetupParams(NamedTuple):
     """
-    TODO: write class description
+    Parameters of the experimental setup.
     """
 
     #: Polar/zenith angle in radians.
@@ -24,6 +24,9 @@ class SetupParams(NamedTuple):
     azimuthal_angle: FloatScalar = jnp.deg2rad(0)
 
 class LightSourceParams(NamedTuple):
+    """
+    Parameters of the light source.
+    """
     
     #: Wavelength in nm.
     wavelength: FloatScalar = 632.8
@@ -54,7 +57,7 @@ class TransmissionMediumParams(NamedTuple):
 
 class LayerParams(NamedTuple):
     """
-    TODO: write class description
+    Parameters of the layer.
     """
 
     #: Layer thicknesses
@@ -65,3 +68,41 @@ class LayerParams(NamedTuple):
 
     #: Layer permittivities
     permittivities: FloatScalarList = 0.0
+
+class ForwardModelParams(NamedTuple):
+    """
+    Collection of all parameters needed for the forward model.
+    """
+
+    #: Model to use for the forward calculation.
+    #: ONE_LAYER_MODEL or TRANSFER_MATRIX_METHOD.
+    model: int = ONE_LAYER_MODEL
+
+    #: Setup parameters (angle of incidence, etc.).
+    setup_params: SetupParams = SetupParams()
+
+    #: Light source parameters (wavelength, etc.).
+    light_source_params: LightSourceParams = LightSourceParams()
+
+    #: Incident medium parameters (permittivity, permeability).
+    incident_medium_params: IncidentMediumParams = IncidentMediumParams()
+
+    #: Transmission medium parameters (permittivity, permeability).
+    transmission_medium_params: TransmissionMediumParams = TransmissionMediumParams()
+
+    #: Static layer parameters (permittivities, permeabilities).
+    static_layer_params: LayerParams = LayerParams()
+
+    #: Variable layer parameters (permittivities, permeabilities).
+    variable_layer_params: LayerParams = LayerParams()
+
+    #: backside mode (0 or 1).
+    backside_mode: int = 0
+
+    #: Polarization state (only applies to ONE_LAYER_MODEL).
+    #: S_POLARIZED or P_POLARIZED.
+    polarization_state: int = S_POLARIZED
+
+    #: Normalization method,
+    #: either NO_NORMALIZATION or MIN_MAX_NORMALIZATION.
+    normalization: int = MIN_MAX_NORMALIZATION
