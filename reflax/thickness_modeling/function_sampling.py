@@ -15,7 +15,6 @@ from reflax.thickness_modeling.numerical_integration import cumulative_trapezoid
 # ================ ↓ Linear Function Sampling ↓ ===============
 # -------------------------------------------------------------
 
-@jax.jit
 def sample_linear_functions(
     random_key,
     num_samples,

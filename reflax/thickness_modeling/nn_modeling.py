@@ -38,22 +38,15 @@ class RawGrowthNN(nnx.Module):
         # input layer: 1 neuron -> hidden layer: dmid neurons
         self.linear1 = nnx.Linear(1, dmid, rngs = rngs)
 
-        # dropout generally helps against overfitting
-        # in our case to possibly make the model more robust
-        # to experimental artifacts
-        self.dropout = nnx.Dropout(0.1, deterministic = False, rngs = rngs)
-
         # middle layer: dmid neurons -> hidden layer: dmid neurons
         self.linear2 = nnx.Linear(dmid, dmid, rngs = rngs)
 
         # output layer: dmid neurons -> 1 neuron
         self.linear_out = nnx.Linear(dmid, 1, rngs = rngs)
 
-    def __call__(self, x, *, train: bool = True):
-        self.dropout.deterministic = not train
+    def __call__(self, x):
         x = self.linear1(x)
         x = nnx.relu(x)
-        x = self.dropout(x)
         x = nnx.relu(self.linear2(x))
         raw_output = self.linear_out(x)
         return raw_output
@@ -172,7 +165,7 @@ def pretrain_loss_fn(
     target_thickness: jnp.ndarray,
     dt: jnp.ndarray
 ) -> jnp.ndarray:
-    raw_output = growth_model(time_input, train=True)
+    raw_output = growth_model(time_input)
     predicted_thickness = calculate_monotonic_thickness(raw_output, dt)
     loss = jnp.mean((predicted_thickness - target_thickness)**2)
     return loss
@@ -248,7 +241,7 @@ def train_nn_model(
     num_epochs: int = 1000000,
     print_interval: int = 500,
     patience: int = 4000
-) -> RawGrowthNN:
+) -> Tuple[RawGrowthNN, jnp.ndarray]:
     """
     Train the neural network model using the forward model.
     """
@@ -262,7 +255,7 @@ def train_nn_model(
     ) -> jnp.ndarray:
     
         # evaluate the model
-        raw_nn_output = model(time_points, train = True)
+        raw_nn_output = model(time_points)
 
         # obtain the predicted thicknesses
         predicted_thicknesses = calculate_monotonic_thickness(raw_nn_output, dt)
@@ -330,6 +323,12 @@ def train_nn_model(
     dt = jnp.concatenate((jnp.array([dt[0]]), dt))
     dt = dt.reshape(-1, 1)
 
+    # Get initial model graph definition and state.
+    # Graph definition is assumed to be static throughout training.
+    # State will be updated. We store the 'best' state found.
+    model_graphdef, current_model_state = nnx.split(model)
+    best_model_state = current_model_state # Initialize with the starting model state
+
     for epoch in range(num_epochs):
 
         loss_val, model = train_step(
@@ -347,23 +346,27 @@ def train_nn_model(
             break
 
         if epoch % print_interval == 0 or epoch == num_epochs - 1:
-            print(f"Epoch {epoch}/{num_epochs}, Loss: {loss_val:.6f}")
+            print(f"Epoch {epoch}/{num_epochs}, Loss: {loss_val:.4e}")
 
         if loss_val < best_loss:
             best_loss = loss_val
             epochs_no_improve = 0
+            _, current_model_state = nnx.split(model)
+            best_model_state = current_model_state
         else:
             epochs_no_improve += 1
 
         if epochs_no_improve >= patience:
-            print(f"Early stopping triggered at epoch {epoch} with loss {loss_val:.6f}")
+            print(f"Early stopping triggered at epoch {epoch} with loss {loss_val:.4e}")
             break
 
     training_time = pytime.time() - start_time
     print(f"training finished in {training_time:.2f} seconds.")
-    print(f"Best loss: {best_loss:.6f}")
+    print(f"Best loss: {best_loss:.4e}")
 
-    return model
+    final_model = nnx.merge(model_graphdef, best_model_state)
+
+    return final_model, jnp.array(losses)
 
 
 # thickness prediction given the model
@@ -380,7 +383,7 @@ def predict_thickness(
     dt = jnp.concatenate((jnp.array([dt[0]]), dt))
     dt = dt.reshape(-1, 1)
 
-    raw_nn_output = model(time_nn, train=False)
+    raw_nn_output = model(time_nn)
     final_thickness = calculate_monotonic_thickness(raw_nn_output, dt)
     return final_thickness
 
@@ -392,7 +395,7 @@ def predict_growth_rate(
     time_points: jnp.ndarray
 ) -> jnp.ndarray:
     time_nn = time_points[:, None]
-    raw_nn_output = model(time_nn, train=False)
+    raw_nn_output = model(time_nn)
     growth_rate = calculate_growth_rate(raw_nn_output)
     return growth_rate
 
