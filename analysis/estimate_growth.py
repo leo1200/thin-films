@@ -214,7 +214,7 @@ class RawGrowthNN(nnx.Module):
     
 def calculate_growth_rate(
         raw_nn_output: jnp.ndarray,
-        scale_factor: float = 100.0
+        scale_factor: float = 1000.0
     ) -> jnp.ndarray:
 
     # ensure growth rate positivity
@@ -229,7 +229,7 @@ def calculate_growth_rate(
 def calculate_monotonic_thickness(
         raw_nn_output: jnp.ndarray,
         dt: jnp.ndarray,
-        scale_factor: float = 100.0
+        scale_factor: float = 1000.0
     ) -> jnp.ndarray:
 
     """

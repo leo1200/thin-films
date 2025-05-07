@@ -8,6 +8,7 @@ import os
 os.environ["CUDA_VISIBLE_DEVICES"] = "4"
 # =======================
 
+from reflax.forward_model.forward_model import batched_forward_model
 from reflax.thickness_modeling.operator_learning import NeuralOperatorMLP, load_model
 
 import jax.numpy as jnp
@@ -96,7 +97,7 @@ variance = 10.0
 min_slope = 200.0
 max_slope = 1800.0
 
-thickness_sample, derivatives = sample_derivative_bound_gp(
+true_thicknesses, true_derivatives = sample_derivative_bound_gp(
     random_key,
     num_samples,
     time_points,
@@ -110,12 +111,7 @@ thickness_sample, derivatives = sample_derivative_bound_gp(
     convex_samples = True,
 )
 
-# squeeze the output, as it is generate with
-# shape num_samples x num_time_steps
-true_thickness = jnp.squeeze(thickness_sample)
-true_growth_rate = jnp.squeeze(derivatives)
-
-true_reflectance = forward_model(
+true_reflectances = batched_forward_model(
     model = ONE_LAYER_MODEL,
     setup_params = setup_params,
     light_source_params = light_source_params,
@@ -123,17 +119,35 @@ true_reflectance = forward_model(
     transmission_medium_params = transmission_medium_params,
     static_layer_params = static_layer_params,
     variable_layer_params = variable_layer_params,
-    variable_layer_thicknesses = thickness_sample,
+    variable_layer_thicknesses = true_thicknesses,
     backside_mode = backside_mode,
     polarization_state = polarization_state,
-    normalization = normalization
+    normalization = normalization,
+    computation_batch_size = 100
 )
 
-# add random noise to the reflectance
-noise = jax.random.normal(random_key, true_reflectance.shape) * 0.01
-# true_reflectance = true_reflectance + noise
+# plot all the generated data
+fig, (ax1, ax2, ax3) = plt.subplots(3, 1, figsize=(8, 12))
 
-true_reflectance = jnp.squeeze(true_reflectance)
+ax1.plot(time_points, true_reflectances.T, alpha=0.5)
+ax1.set_title("Reflectance")
+ax1.set_xlabel("Time")
+ax1.set_ylabel("Reflectance")
+
+ax2.plot(time_points, true_thicknesses.T, alpha=0.5)
+ax2.set_title("Thicknesses")
+ax2.set_xlabel("Time")
+ax2.set_ylabel("Thickness")
+
+ax3.plot(time_points, true_derivatives.T, alpha=0.5)
+ax3.set_title("Derivatives")
+ax3.set_xlabel("Time")
+ax3.set_ylabel("Derivative")
+
+plt.tight_layout()
+
+plt.savefig("figures/validation_data.png", dpi=300)
+
 
 # -------------------------------------------------------------
 # ================ ↑ example data generation ↑ ================
@@ -343,38 +357,98 @@ def estimate_thickness(
         growth_rate_loss,
     )
 
-(
-    reflectance_losses,
-    thickness_losses,
-    growth_rate_losses,
-    predicted_reflectance,
-    predicted_thickness,
-    predicted_growth_rate,
-    initialized_thickness,
-    initialized_reflectance,
-    initialized_growth_rate,
-    initialized_time_points,
-    initial_reflectance_loss,
-    initial_thickness_loss,
-    initial_growth_rate_loss,
-    reflectance_loss,
-    thickness_loss,
-    growth_rate_loss,
-) = estimate_thickness(
-    time_points,
-    true_reflectance,
-    true_thickness,
-    true_growth_rate,
-    learning_rate = 4e-4,
-    num_epochs = 14000,
-    print_interval = 500,
-    patience = 8000,
-    nn_initialization = LINEAR_INITIALIZATION_TRAINED,
-    initial_linear_growth_rate = 800.0,
-    seed_for_random_initialization = 0,
-    pretrain_learning_rate = 4e-3,
-    pretrain_num_epochs = 30000,
-)
+initializations = [
+    RANDOM_INITIALIZATION,
+    LINEAR_INITIALIZATION_SET,
+    LINEAR_INITIALIZATION_TRAINED,
+    NEURAL_OPERATOR_INITIALIZATION,
+]
+
+def initialization_to_string(initialization):
+    if initialization == RANDOM_INITIALIZATION:
+        return "RANDOM_INITIALIZATION"
+    elif initialization == LINEAR_INITIALIZATION_SET:
+        return "LINEAR_INITIALIZATION_SET"
+    elif initialization == LINEAR_INITIALIZATION_TRAINED:
+        return "LINEAR_INITIALIZATION_TRAINED"
+    elif initialization == NEURAL_OPERATOR_INITIALIZATION:
+        return "NEURAL_OPERATOR_INITIALIZATION"
+    else:
+        raise ValueError("Invalid initialization type.")
+    
+# loop over all samples
+for i in range(true_thicknesses.shape[0]):
+    print(f"Sample {i + 1}/{true_thicknesses.shape[0]}")
+
+    # get the true reflectance, thickness and growth rate
+    true_reflectance = true_reflectances[i]
+    true_thickness = true_thicknesses[i]
+    true_growth_rate = true_derivatives[i]
+
+    # loop over all initializations
+    for initialization in initializations:
+        print(f"Initialization: {initialization_to_string(initialization)}")
+
+        # estimate the thickness
+        (
+            reflectance_losses,
+            thickness_losses,
+            growth_rate_losses,
+            predicted_reflectance,
+            predicted_thickness,
+            predicted_growth_rate,
+            initialized_thickness,
+            initialized_reflectance,
+            initialized_growth_rate,
+            initialized_time_points,
+            initial_reflectance_loss,
+            initial_thickness_loss,
+            initial_growth_rate_loss,
+            reflectance_loss,
+            thickness_loss,
+            growth_rate_loss,
+        ) = estimate_thickness(
+            time_points,
+            true_reflectance,
+            true_thickness,
+            true_growth_rate,
+            learning_rate = 4e-4,
+            num_epochs = 14000,
+            print_interval = 500,
+            patience = 8000,
+            nn_initialization = initialization,
+            initial_linear_growth_rate = 1000.0,
+            seed_for_random_initialization = 0,
+            pretrain_learning_rate = 4e-3,
+            pretrain_num_epochs = 30000,
+        )
+
+        # save the results
+        jnp.savez(
+            f"result_data/{initialization_to_string(initialization)}/{initialization_to_string(initialization)}_{i + 1}.npz",
+            sample_index = i,
+            initialization = initialization,
+            time_points = time_points,
+            true_reflectance = true_reflectance,
+            true_thickness = true_thickness,
+            true_growth_rate = true_growth_rate,
+            initialized_time_points = initialized_time_points,
+            initialized_reflectance = initialized_reflectance,
+            initialized_thickness = initialized_thickness,
+            initialized_growth_rate = initialized_growth_rate,
+            predicted_reflectance = predicted_reflectance,
+            predicted_thickness = predicted_thickness,
+            predicted_growth_rate = predicted_growth_rate,
+            reflectance_losses = reflectance_losses,
+            thickness_losses = thickness_losses,
+            growth_rate_losses = growth_rate_losses,
+            initial_reflectance_loss = initial_reflectance_loss,
+            initial_thickness_loss = initial_thickness_loss,
+            initial_growth_rate_loss = initial_growth_rate_loss,
+            reflectance_loss = reflectance_loss,
+            thickness_loss = thickness_loss,
+            growth_rate_loss = growth_rate_loss
+        )
 
 # -------------------------------------------------------------
 # ================= ↑ neural network fitting ↑ ================
@@ -385,81 +459,7 @@ def estimate_thickness(
 # ======================== ↓ plotting ↓ =======================
 # -------------------------------------------------------------
 
-fig, (ax1, ax2, ax3) = plt.subplots(3, 1, figsize=(8, 10))
-
-# plot true reflectance in the first subplot
-ax1.plot(time_points, true_reflectance, label = "measured reflectance")
-ax1.plot(time_points, predicted_reflectance, label = "predicted reflectance")
-ax1.set_xlabel("time in hours")
-ax1.set_ylabel("reflectance")
-ax1.legend(loc = "upper right")
-ax1.set_title("Reflectance")
-
-# plot thickness sample in the second subplot
-ax2.plot(time_points, true_thickness, label = "true thickness")
-ax2.plot(time_points, predicted_thickness, label = "predicted thickness")
-# ax2.plot(time_points, initial_thickness_guess, label = "initial guess")
-ax2.plot(
-    initialized_time_points,
-    initialized_thickness,
-    label = "initial prediction",
-    linestyle = "--"
-)
-ax2.set_xlabel("time in hours")
-ax2.set_ylabel("thickness in nm")
-ax2.legend(loc = "upper right")
-ax2.set_title("Thickness")
-
-# plot derivative in the third subplot
-ax3.plot(time_points, true_growth_rate, label = "true growth rate")
-ax3.plot(time_points, predicted_growth_rate, label = "predicted growth rate")
-ax3.plot(
-    initialized_time_points,
-    initialized_growth_rate,
-    label = "initial prediction",
-    linestyle = "--"
-)
-ax3.set_xlabel("time in hours")
-ax3.set_ylabel("growth rate in nm/h")
-ax3.legend(loc = "lower right")
-ax3.set_title("Growth Rate")
-
-plt.tight_layout()
-
-plt.savefig("figures/optimization_example.svg")
-
-# in a second plot, plot the losses
-fig, (ax1, ax2, ax3) = plt.subplots(3, 1, figsize=(8, 10))
-
-# plot the reflectance loss
-ax1.plot(reflectance_losses, label = "reflectance loss")
-# set the y axis to log scale
-ax1.set_yscale("log")
-ax1.set_xlabel("epoch")
-ax1.set_ylabel("loss")
-ax1.legend(loc = "upper right")
-ax1.set_title("Reflectance Loss")
-
-# plot the thickness loss
-ax2.plot(thickness_losses, label = "thickness loss")
-# set the y axis to log scale
-ax2.set_yscale("log")
-ax2.set_xlabel("epoch")
-ax2.set_ylabel("loss")
-ax2.legend(loc = "upper right")
-ax2.set_title("Thickness Loss")
-
-# plot the growth rate loss
-ax3.plot(growth_rate_losses, label = "growth rate loss")
-# set the y axis to log scale
-ax3.set_yscale("log")
-ax3.set_xlabel("epoch")
-ax3.set_ylabel("loss")
-ax3.legend(loc = "upper right")
-ax3.set_title("Growth Rate Loss")
-
-plt.tight_layout()
-plt.savefig("figures/optimization_example_losses.svg")
+# TODO
 
 # -------------------------------------------------------------
 # ======================== ↑ plotting ↑ =======================

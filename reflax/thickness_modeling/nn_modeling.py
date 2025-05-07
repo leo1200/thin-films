@@ -53,7 +53,7 @@ class RawGrowthNN(nnx.Module):
     
 def calculate_growth_rate(
         raw_nn_output: jnp.ndarray,
-        scale_factor: float = 100.0
+        scale_factor: float = 1000.0
     ) -> jnp.ndarray:
 
     # ensure growth rate positivity
@@ -68,7 +68,7 @@ def calculate_growth_rate(
 def calculate_monotonic_thickness(
         raw_nn_output: jnp.ndarray,
         dt: jnp.ndarray,
-        scale_factor: float = 100.0
+        scale_factor: float = 1000.0
     ) -> jnp.ndarray:
 
     """
@@ -119,7 +119,7 @@ def calculate_monotonic_thickness(
 def linear_output_initialization(
     model: RawGrowthNN,
     target_growth_rate: float,
-    scale_factor: float = 100.0
+    scale_factor: float = 1000.0
 ) -> RawGrowthNN:
     """
     Initialize the output layer of the neural network
@@ -193,34 +193,57 @@ def pretrained_initialization(
     """
     Initialize the neural network to reproduce the target
     thickness profile at the given time points.
+    Returns the model with the best (lowest) loss during pre-training.
     """
 
     time_nn_input = time_points[:, None]
 
     dt = jnp.diff(time_points)
-    dt = jnp.concatenate((jnp.array([dt[0]]), dt))
+    dt = jnp.concatenate((jnp.array([dt[0]]), dt)) # Simple way to get dt for first point
     dt = dt.reshape(-1, 1)
 
-    # adam optimizer
-    pretrain_optimizer = nnx.Optimizer(growth_model, optax.adam(learning_rate = pretrain_lr))
+    # Adam optimizer
+    pretrain_optimizer = nnx.Optimizer(growth_model, optax.adam(learning_rate=pretrain_lr))
 
-    # start pre-training
+    # For storing the best model
+    best_loss = jnp.inf
+    model_graphdef, initial_model_state = nnx.split(growth_model) # Graphdef is static
+    best_model_state = initial_model_state # Start with the initial state as 'best'
+
+    # Start pre-training
     print("👷 pre-training neural network...")
     pretrain_start_time = pytime.time()
 
     for epoch in range(pretrain_epochs):
+        # The `growth_model` passed to pretrain_step is updated in-place by the optimizer
         loss, growth_model, pretrain_optimizer = pretrain_step(
             growth_model, pretrain_optimizer, time_nn_input, target_thickness, dt
         )
+
+        if jnp.isnan(loss):
+            print(f"Pre-train Epoch {epoch}/{pretrain_epochs}: NaN loss detected. Stopping pre-training.")
+            break # Exit loop, will return the best model found so far
+
+        if loss < best_loss:
+            best_loss = loss
+            # Save the state of the current best model
+            # growth_model has been updated by pretrain_step (via optimizer)
+            _, best_model_state = nnx.split(growth_model)
+            if epoch % 200 == 0 or epoch == pretrain_epochs - 1: # Also log if it's a new best
+                 print(f"🚀 New best! Pre-train Epoch {epoch}/{pretrain_epochs}, Loss: {loss:.4e}")
+
         if epoch % 200 == 0 or epoch == pretrain_epochs - 1:
-            print(f"Pre-train Epoch {epoch}/{pretrain_epochs}, Loss (vs NO guess): {loss:.4e}")
-            if jnp.isnan(loss):
-                print("NaN loss during pre-training. Stopping.")
-                return
+            # Conditional print to avoid double printing if it was a new best
+            if loss >= best_loss and not (epoch % 200 == 0 and loss == best_loss): # Avoid double print for new best on log interval
+                print(f"Pre-train Epoch {epoch}/{pretrain_epochs}, Current Loss: {loss:.4e} (Best: {best_loss:.4e})")
     
     print(f"Pre-training finished in {pytime.time() - pretrain_start_time:.2f}s")
+    print(f"🏆 Best pre-training loss achieved: {best_loss:.4e}")
 
-    return growth_model
+    # Reconstruct the best model using the stored graphdef and best state
+    best_growth_model = nnx.merge(model_graphdef, best_model_state)
+
+    return best_growth_model
 
 
 # -------------------------------------------------------------
@@ -240,8 +263,10 @@ def train_nn_model(
     learning_rate: float = 1e-4,
     num_epochs: int = 1000000,
     print_interval: int = 500,
-    patience: int = 4000
-) -> Tuple[RawGrowthNN, jnp.ndarray]:
+    patience: int = 4000,
+    true_thickness: jnp.ndarray = None,
+    true_growth_rate: jnp.ndarray = None,
+):
     """
     Train the neural network model using the forward model.
     """
@@ -314,7 +339,14 @@ def train_nn_model(
     print("starting training...")
     start_time = pytime.time()
 
-    losses = []
+    reflectance_losses = []
+
+    if true_thickness is not None:
+        thickness_losses = []
+    
+    if true_growth_rate is not None:
+        growth_rate_losses = []
+
     best_loss = float('inf')
     epochs_no_improve = 0
     time_nn = time_points[:, None]
@@ -339,7 +371,21 @@ def train_nn_model(
             target_reflectance
         )
 
-        losses.append(loss_val)
+        reflectance_losses.append(loss_val)
+
+        if true_thickness is not None:
+            # calculate the thickness loss
+            raw_nn_output = model(time_nn)
+            predicted_thickness = calculate_monotonic_thickness(raw_nn_output, dt)
+            thickness_loss = jnp.mean((predicted_thickness - true_thickness)**2)
+            thickness_losses.append(thickness_loss)
+
+        if true_growth_rate is not None:
+            # calculate the growth rate loss
+            raw_nn_output = model(time_nn)
+            predicted_growth_rate = calculate_growth_rate(raw_nn_output)
+            growth_rate_loss = jnp.mean((predicted_growth_rate - true_growth_rate)**2)
+            growth_rate_losses.append(growth_rate_loss)
 
         if jnp.isnan(loss_val):
             print(f"NaN loss encountered at epoch {epoch}! Stopping training.")
@@ -366,7 +412,14 @@ def train_nn_model(
 
     final_model = nnx.merge(model_graphdef, best_model_state)
 
-    return final_model, jnp.array(losses)
+    if true_thickness is not None and true_growth_rate is not None:
+        return final_model, reflectance_losses, thickness_losses, growth_rate_losses
+    elif true_thickness is not None:
+        return final_model, reflectance_losses, thickness_losses
+    elif true_growth_rate is not None:
+        return final_model, reflectance_losses, growth_rate_losses
+    else:
+        return final_model, reflectance_losses
 
 
 # thickness prediction given the model
