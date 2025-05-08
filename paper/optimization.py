@@ -5,7 +5,7 @@
 # autocvd(num_gpus = 1)
 # only use gpu 9
 import os
-os.environ["CUDA_VISIBLE_DEVICES"] = "4"
+os.environ["CUDA_VISIBLE_DEVICES"] = "7"
 # =======================
 
 from reflax.thickness_modeling.operator_learning import NeuralOperatorMLP, load_model
@@ -130,8 +130,8 @@ true_reflectance = forward_model(
 )
 
 # add random noise to the reflectance
-noise = jax.random.normal(random_key, true_reflectance.shape) * 0.01
-# true_reflectance = true_reflectance + noise
+noise = jax.random.normal(random_key, true_reflectance.shape) * 0.05
+true_reflectance = true_reflectance + noise
 
 true_reflectance = jnp.squeeze(true_reflectance)
 
@@ -158,7 +158,7 @@ def estimate_thickness(
     num_epochs = 15000,
     print_interval = 500,
     patience = 8000,
-    nn_initialization = LINEAR_INITIALIZATION_TRAINED,
+    nn_initialization = NEURAL_OPERATOR_INITIALIZATION,
     initial_linear_growth_rate = 1000.0,
     seed_for_random_initialization = 0,
     pretrain_learning_rate = 4e-4,
@@ -369,8 +369,8 @@ def estimate_thickness(
     num_epochs = 14000,
     print_interval = 500,
     patience = 8000,
-    nn_initialization = LINEAR_INITIALIZATION_TRAINED,
-    initial_linear_growth_rate = 800.0,
+    nn_initialization = NEURAL_OPERATOR_INITIALIZATION,
+    initial_linear_growth_rate = 1000.0,
     seed_for_random_initialization = 0,
     pretrain_learning_rate = 4e-3,
     pretrain_num_epochs = 30000,
@@ -426,7 +426,7 @@ ax3.set_title("Growth Rate")
 
 plt.tight_layout()
 
-plt.savefig("figures/optimization_example.svg")
+plt.savefig("figures/optimization_example_noise.svg")
 
 # in a second plot, plot the losses
 fig, (ax1, ax2, ax3) = plt.subplots(3, 1, figsize=(8, 10))
@@ -459,7 +459,7 @@ ax3.legend(loc = "upper right")
 ax3.set_title("Growth Rate Loss")
 
 plt.tight_layout()
-plt.savefig("figures/optimization_example_losses.svg")
+plt.savefig("figures/optimization_example_losses_noise.svg")
 
 # -------------------------------------------------------------
 # ======================== ↑ plotting ↑ =======================

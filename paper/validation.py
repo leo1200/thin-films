@@ -5,7 +5,7 @@
 # autocvd(num_gpus = 1)
 # only use gpu 9
 import os
-os.environ["CUDA_VISIBLE_DEVICES"] = "4"
+os.environ["CUDA_VISIBLE_DEVICES"] = "2"
 # =======================
 
 from reflax.forward_model.forward_model import batched_forward_model
@@ -90,7 +90,7 @@ normalization = forward_model_params.normalization
 time_points = jnp.linspace(0, 1, 400)
 
 random_key = jax.random.PRNGKey(69)
-num_samples = 1
+num_samples = 200
 
 lengthscale = 0.1
 variance = 10.0
