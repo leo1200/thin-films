@@ -126,6 +126,7 @@ true_reflectances = batched_forward_model(
     computation_batch_size = 100
 )
 
+
 # plot all the generated data
 fig, (ax1, ax2, ax3) = plt.subplots(3, 1, figsize=(8, 12))
 
