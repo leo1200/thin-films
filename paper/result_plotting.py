@@ -150,7 +150,7 @@ def produce_plot(initialization, sample_number):
     plt.close("all")
 
 # for initialization in initializations:
-#     total_samples = 38
+#     total_samples = 148
 #     for sample_number in range(1, total_samples + 1):
 #         produce_plot(initialization, sample_number)
 #         print(f"produced plot for {initialization_to_string(initialization)}_{sample_number}")
@@ -191,7 +191,7 @@ losses_by_init_and_epoch = {
 }
 
 for initialization in [LINEAR_INITIALIZATION_TRAINED, NEURAL_OPERATOR_INITIALIZATION]:
-    total_samples = 38
+    total_samples = 148
     for sample_number in range(1, total_samples + 1):
         data = np.load(f"result_data/{initialization_to_string(initialization)}/{initialization_to_string(initialization)}_{sample_number}.npz")
         
@@ -298,7 +298,7 @@ neural_operator_initial_losses_growth_rate = []
 growth_rate_loss_barrier = 5e2
 
 for initialization in initializations:
-    total_samples = 38
+    total_samples = 148
     for sample_number in range(1, total_samples + 1):
         data = np.load(f"result_data/{initialization_to_string(initialization)}/{initialization_to_string(initialization)}_{sample_number}.npz")
 
@@ -419,6 +419,10 @@ for ax, loss_dict, title in zip(axes, loss_dicts, titles):
     ax.set_xlabel("Loss")
     ax.set_ylabel("Density")
     ax.legend()
+
+# set upper x limit of ax 1 and 2 to 10^8
+axes[1].set_xlim(right=1e8)
+axes[2].set_xlim(right=1e8)
 
 plt.tight_layout()
 plt.savefig("figures/losses_kde.svg")
