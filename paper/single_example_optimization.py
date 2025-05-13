@@ -5,7 +5,7 @@
 # autocvd(num_gpus = 1)
 # only use gpu 9
 import os
-os.environ["CUDA_VISIBLE_DEVICES"] = "7"
+os.environ["CUDA_VISIBLE_DEVICES"] = "5"
 # =======================
 
 from reflax.thickness_modeling.operator_learning import NeuralOperatorMLP, load_model
@@ -138,10 +138,15 @@ def optimize_single_example(
     )
 
     # add random noise to the reflectance
+    clean_signal_std = jnp.std(jnp.squeeze(true_reflectance))
     noise = jax.random.normal(random_key, true_reflectance.shape) * noise_level
     true_reflectance = true_reflectance + noise
-
+    noise_std = jnp.std(noise)
     true_reflectance = jnp.squeeze(true_reflectance)
+
+    snr = clean_signal_std / noise_std
+    snr_db = 10 * jnp.log10(snr)
+    print(f"snr: {snr_db:.2f}")
 
     # -------------------------------------------------------------
     # ================ ↑ example data generation ↑ ================
@@ -467,6 +472,21 @@ def optimize_single_example(
 
     plt.tight_layout()
     plt.savefig("figures/" + loss_over_epoch_title + ".svg")
+
+    # return everything needed for plotting the first plot
+    return (
+        true_reflectance,
+        true_thickness,
+        true_growth_rate,
+        predicted_reflectance,
+        predicted_thickness,
+        predicted_growth_rate,
+        initialized_thickness,
+        initialized_reflectance,
+        initialized_growth_rate,
+        initialized_time_points,
+        snr_db,
+    )
 
     # -------------------------------------------------------------
     # ======================== ↑ plotting ↑ =======================

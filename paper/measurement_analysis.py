@@ -1,0 +1,453 @@
+# ==== GPU selection ====
+# from autocvd import autocvd
+
+# from reflax.constants import S_POLARIZED
+# autocvd(num_gpus = 1)
+# only use gpu 9
+import os
+
+from reflax.forward_model.forward_model import batched_forward_model
+from reflax.thickness_modeling.nn_modeling import RawGrowthNN, predict_growth_rate, predict_thickness, pretrained_initialization, train_nn_model
+os.environ["CUDA_VISIBLE_DEVICES"] = "9"
+# =======================
+
+import jax
+import numpy as np
+
+import jax.numpy as jnp
+from flax import nnx
+from reflax.thickness_modeling.operator_learning import (
+    NeuralOperatorMLP,
+    load_model,
+    save_model,
+    train_neural_operator
+)
+
+import matplotlib.pyplot as plt
+
+
+# NOTE: without 64-bit precision,
+# the Cholesky decomposition fails
+from jax import config
+config.update("jax_enable_x64", True)
+
+import matplotlib.pyplot as plt
+
+# simulator setup
+from reflax.parameter_classes.parameters import (
+    ForwardModelParams,
+    LayerParams,
+    SetupParams,
+    LightSourceParams,
+    TransmissionMediumParams,
+    IncidentMediumParams
+)
+
+# constants
+from reflax import (
+    ONE_LAYER_MODEL,
+    TRANSFER_MATRIX_METHOD,
+    S_POLARIZED,
+    NO_NORMALIZATION,
+    MIN_MAX_NORMALIZATION
+)
+
+# forward model
+from reflax import (
+    forward_model
+)
+
+from reflax import get_polarization_components
+
+from reflax.thickness_modeling.function_sampling import (
+    sample_derivative_bound_gp,
+    sample_linear_functions
+)
+
+train_data_path = "training_data/training_data_setup2.npz"
+neural_operator_path = "models/neural_operator_setup2.pickle"
+figpath = "figures/measurement_analysis_setup2.png"
+model = ONE_LAYER_MODEL
+learning_rate = 4e-4
+num_epochs = 15000
+print_interval = 500
+patience = 8000
+initial_linear_growth_rate = 1000.0
+seed_for_random_initialization = 0
+pretrain_learning_rate = 4e-4
+pretrain_num_epochs = 20000
+
+# -------------------------------------------------------------
+# ==================== ↓ load measurement ↓ ===================
+# -------------------------------------------------------------
+
+measurement = np.loadtxt("measurements/reflectance.txt", skiprows = 1)
+time_raw = jnp.array(measurement[:-100, 0])
+
+# convert the time to hours, numerically ~ nicely between 0 and 1
+time_points_measured = time_raw / 3600
+final_time = time_points_measured[-1]
+reflectance_raw = jnp.array(measurement[:-100, 1])
+
+# normalize and center the reflectance
+measured_reflectance = (
+    reflectance_raw - 0.5 * (jnp.min(reflectance_raw) + jnp.max(reflectance_raw))
+) / (0.5 * (jnp.max(reflectance_raw) - jnp.min(reflectance_raw)))
+
+# -------------------------------------------------------------
+# ==================== ↑ load measurement ↑ ===================
+# -------------------------------------------------------------
+
+# -------------------------------------------------------------
+# ===================== ↓ Simulator Setup ↓ ===================
+# -------------------------------------------------------------
+
+normalization = MIN_MAX_NORMALIZATION
+
+wavelength = 632.8
+
+polar_angle = jnp.deg2rad(25)
+azimuthal_angle = jnp.deg2rad(0)
+
+polarization_state = S_POLARIZED
+s_component, p_component = get_polarization_components(polarization_state)
+
+light_source_params = LightSourceParams(
+    wavelength = wavelength,
+    s_component = s_component,
+    p_component = p_component
+)
+
+setup_params = SetupParams(
+    polar_angle = polar_angle,
+    azimuthal_angle = azimuthal_angle,
+)
+
+permeability_reflection = 1.0
+permittivity_reflection = 1.0
+
+incident_medium_params = IncidentMediumParams(
+    permeability_reflection = permeability_reflection,
+    permittivity_reflection = permittivity_reflection
+)
+
+permeability_transmission = 1.0
+permittivity_transmission = (3.8827 + 0.019626j)**2
+
+transmission_medium_params = TransmissionMediumParams(
+    permeability_transmission = permeability_transmission,
+    permittivity_transmission = permittivity_transmission
+)
+
+backside_mode = 1
+
+
+static_layer_params = LayerParams(
+    permeabilities = jnp.array([1.0]),
+    permittivities = jnp.array([1.457**2]),
+    thicknesses = jnp.array([0.0])
+)
+
+n_variable = 1.457
+k_variable = 0.0
+permeability_variable_layer = 1.0
+permittivity_variable_layer = (n_variable + 1j * k_variable)**2
+variable_layer_params = LayerParams(
+    permeabilities = permeability_variable_layer,
+    permittivities = permittivity_variable_layer,
+)
+
+forward_model_params = ForwardModelParams(
+    model = model,
+    setup_params = setup_params,
+    light_source_params = light_source_params,
+    incident_medium_params = incident_medium_params,
+    transmission_medium_params = transmission_medium_params,
+    static_layer_params = static_layer_params,
+    variable_layer_params = variable_layer_params,
+    backside_mode = backside_mode,
+    polarization_state = polarization_state,
+    normalization = normalization,
+)
+
+# -------------------------------------------------------------
+# ===================== ↑ Simulator Setup ↑ ===================
+# -------------------------------------------------------------
+
+# -------------------------------------------------------------
+# ===================== ↓ data generation ↓ ===================
+# -------------------------------------------------------------
+
+num_eval_points = 100
+time_points_neural_operator = jnp.linspace(0, final_time, num_eval_points)
+
+num_samples_linear = 100
+num_samplesA = 1000
+num_samplesB = 1000
+
+random_key_linear = jax.random.PRNGKey(123)
+
+thicknesses_linear, derivatives_linear = sample_linear_functions(
+    random_key_linear,
+    num_samples_linear,
+    time_points_neural_operator,
+    800.0,
+    1200.0,
+)
+
+random_keyA = jax.random.PRNGKey(89)
+
+lengthscaleA = 0.4
+variance = 15.0
+min_slope = 200.0
+max_slope = 1800.0
+
+thickness_gpA, derivatives_gpA = sample_derivative_bound_gp(
+    random_keyA,
+    num_samplesA,
+    time_points_neural_operator,
+    lengthscaleA,
+    variance,
+    min_slope,
+    max_slope,
+    random_final_values = True,
+    min_final_value = 800.0,
+    max_final_value = 1200.0,
+    convex_samples = True,
+)
+
+random_keyB = jax.random.PRNGKey(69)
+lengthscaleB = 0.2
+
+thickness_gpB, derivatives_gpB = sample_derivative_bound_gp(
+    random_keyB,
+    num_samplesB,
+    time_points_neural_operator,
+    lengthscaleA,
+    variance,
+    min_slope,
+    max_slope,
+    random_final_values = True,
+    min_final_value = 800.0,
+    max_final_value = 1200.0,
+    convex_samples = True,
+)
+
+# concatenate all thicknesses (linear and GP) and derivatives
+thicknesses = jnp.concatenate((thicknesses_linear, thickness_gpA, thickness_gpB), axis=0)
+derivatives = jnp.concatenate((derivatives_linear, derivatives_gpA, derivatives_gpB), axis=0)
+
+# generate reflectance data
+reflectances = batched_forward_model(
+    model = model,
+    setup_params = setup_params,
+    light_source_params = light_source_params,
+    incident_medium_params = incident_medium_params,
+    transmission_medium_params = transmission_medium_params,
+    static_layer_params = static_layer_params,
+    variable_layer_params = variable_layer_params,
+    variable_layer_thicknesses = thicknesses,
+    backside_mode = backside_mode,
+    polarization_state = polarization_state,
+    normalization = normalization,
+    computation_batch_size = 100
+)
+
+# print the shapes of the generated data
+print(f"Thicknesses shape: {thicknesses.shape}")
+print(f"Derivatives shape: {derivatives.shape}")
+print(f"Reflectances shape: {reflectances.shape}")
+print(f"Time points shape: {time_points_neural_operator.shape}")
+
+# save the training data
+jnp.savez(
+    train_data_path,
+    thicknesses = thicknesses,
+    derivatives = derivatives,
+    reflectances = reflectances,
+    time_points = time_points_neural_operator,
+)
+
+# -------------------------------------------------------------
+# ===================== ↑ data generation ↑ ===================
+# -------------------------------------------------------------
+
+# -------------------------------------------------------------
+# ================= ↓ train neural operator ↓ =================
+# -------------------------------------------------------------
+
+
+# load the training data
+training_data = jnp.load(train_data_path)
+reflectances = training_data["reflectances"]
+thicknesses = training_data["thicknesses"]
+derivatives = training_data["derivatives"]
+time_points_neural_operator = training_data["time_points"]
+
+neural_operator = NeuralOperatorMLP(
+    hidden_dims = [512, 512],
+    num_eval_points = time_points_neural_operator.shape[0],
+    rngs = nnx.Rngs(42),
+)
+
+neural_operator = train_neural_operator(
+    model = neural_operator,
+    reflectance_data = reflectances,
+    thickness_data = thicknesses,
+    learning_rate = 1e-4,
+    test_set_size = 0.2,
+    num_epochs = 20000,
+    print_interval = 500,
+    patience = 4000,
+    random_seed_split = 42 
+)
+
+save_model(
+    neural_operator,
+    filepath = neural_operator_path,
+)
+
+# -------------------------------------------------------------
+# ================= ↑ train neural operator ↑ =================
+# -------------------------------------------------------------
+
+# -------------------------------------------------------------
+# ================ ↓ neural network fitting ↓ =================
+# -------------------------------------------------------------
+
+# initialize the neural network
+growth_nn = RawGrowthNN(dmid = 1024, rngs = nnx.Rngs(seed_for_random_initialization))
+
+training_data = jnp.load(train_data_path)
+initialized_time_points = training_data["time_points"]
+num_points_no = initialized_time_points.shape[0]
+neural_operator = NeuralOperatorMLP(
+    hidden_dims = [512, 512],
+    num_eval_points = num_points_no,
+    rngs = nnx.Rngs(42),
+)
+# load the neural operator model
+neural_operator = load_model(
+    filepath = neural_operator_path,
+    abstract_model = neural_operator,
+)
+# downsample the time points to the number of points in the neural operator
+indices = jnp.linspace(0, time_points_measured.shape[0] - 1, num_points_no).astype(int)
+initialized_time_points = time_points_measured[indices]
+measured_reflectance_initialized = measured_reflectance[indices]
+initialized_thickness = neural_operator(measured_reflectance_initialized)
+# calculate the derivative from the predicted thickness
+initialized_growth_rate = jnp.gradient(initialized_thickness, initialized_time_points)
+
+# initialize the neural network to the neural operator result
+growth_nn = pretrained_initialization(
+    growth_nn,
+    initialized_thickness,
+    initialized_time_points,
+    pretrain_num_epochs,
+    pretrain_learning_rate,
+)
+
+# train the neural network on the generated data
+growth_nn, reflectance_losses, thickness_losses, growth_rate_losses = train_nn_model(
+    growth_nn,
+    forward_model_params,
+    time_points_measured,
+    measured_reflectance,
+    learning_rate = learning_rate,
+    num_epochs = num_epochs,
+    print_interval = print_interval,
+    patience = patience
+)
+
+# predict the thickness and derivative
+predicted_thickness = predict_thickness(
+    growth_nn,
+    time_points_measured
+)
+predicted_growth_rate = predict_growth_rate(
+    growth_nn,
+    time_points_measured
+)
+
+# calculate the reflectance of the initialized thickness
+initialized_reflectance = forward_model(
+    model = model,
+    setup_params = setup_params,
+    light_source_params = light_source_params,
+    incident_medium_params = incident_medium_params,
+    transmission_medium_params = transmission_medium_params,
+    static_layer_params = static_layer_params,
+    variable_layer_params = variable_layer_params,
+    variable_layer_thicknesses = initialized_thickness,
+    backside_mode = backside_mode,
+    polarization_state = polarization_state,
+    normalization = normalization
+)
+
+# calculate the reflectance from the predicted thickness
+predicted_reflectance = forward_model(
+    model = model,
+    setup_params = setup_params,
+    light_source_params = light_source_params,
+    incident_medium_params = incident_medium_params,
+    transmission_medium_params = transmission_medium_params,
+    static_layer_params = static_layer_params,
+    variable_layer_params = variable_layer_params,
+    variable_layer_thicknesses = predicted_thickness,
+    backside_mode = backside_mode,
+    polarization_state = polarization_state,
+    normalization = normalization
+)
+
+# -------------------------------------------------------------
+# ================ ↑ neural network fitting ↑ =================
+# -------------------------------------------------------------
+
+# -------------------------------------------------------------
+# ======================= ↓ plotting ↓ ========================
+# -------------------------------------------------------------
+
+fig, (ax1, ax2, ax3) = plt.subplots(3, 1, figsize=(8, 10))
+
+# plot true reflectance in the first subplot
+ax1.plot(time_points_measured, measured_reflectance, label = "measured reflectance")
+ax1.plot(time_points_measured, predicted_reflectance, label = "predicted reflectance")
+ax1.set_xlabel("time in hours")
+ax1.set_ylabel("reflectance")
+ax1.legend(loc = "upper right")
+ax1.set_title("Reflectance")
+
+# plot thickness sample in the second subplot
+ax2.plot(time_points_measured, predicted_thickness, label = "predicted thickness")
+ax2.plot(
+    initialized_time_points,
+    initialized_thickness,
+    label = "initial prediction",
+    linestyle = "--"
+)
+ax2.set_xlabel("time in hours")
+ax2.set_ylabel("thickness in nm")
+ax2.legend(loc = "upper right")
+ax2.set_title("Thickness")
+
+# plot derivative in the third subplot
+ax3.plot(time_points_measured, predicted_growth_rate, label = "predicted growth rate")
+ax3.plot(
+    initialized_time_points,
+    initialized_growth_rate,
+    label = "initial prediction",
+    linestyle = "--"
+)
+ax3.set_xlabel("time in hours")
+ax3.set_ylabel("growth rate in nm/h")
+ax3.legend(loc = "lower right")
+ax3.set_title("Growth Rate")
+
+plt.tight_layout()
+
+plt.savefig(figpath)
+
+# -------------------------------------------------------------
+# ======================= ↑ plotting ↑ ========================
+# -------------------------------------------------------------
