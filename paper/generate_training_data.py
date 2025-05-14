@@ -171,11 +171,13 @@ thickness_gpA, derivatives_gpA = sample_derivative_bound_gp(
 random_keyB = jax.random.PRNGKey(69)
 lengthscaleB = 0.2
 
+# THERE WAS AN ERROR HERE SO WE ACTUALLY USED LENGTHSCALE A
+# TWICE!!!!, so 2k with lengthscale 0.4!
 thickness_gpB, derivatives_gpB = sample_derivative_bound_gp(
     random_keyB,
     num_samplesB,
     time_points,
-    lengthscaleA,
+    lengthscaleB,
     variance,
     min_slope,
     max_slope,

@@ -4,6 +4,8 @@ import matplotlib.pyplot as plt
 
 import seaborn as sns
 
+import matplotlib.lines as mlines # For manual legend
+
 RANDOM_INITIALIZATION = 0
 LINEAR_INITIALIZATION_SET = 1
 LINEAR_INITIALIZATION_TRAINED = 2
@@ -155,33 +157,28 @@ def plot_all_validation_results(total_samples = 200):
             produce_plot(initialization, sample_number)
             print(f"produced plot for {initialization_to_string(initialization)}_{sample_number}")
 
-
 def plot_validation_loss_curves(total_samples = 200, figpath = "figures/all_losses.svg"):
-    # create a figure for all losses
-    fig, (ax1, ax2, ax3) = plt.subplots(3, 1, figsize=(8, 10))
+    fig, (ax1, ax2, ax3) = plt.subplots(1, 3, figsize=(18, 5)) 
+    axes = [ax1, ax2, ax3] 
 
     initialization_colors = {
-        RANDOM_INITIALIZATION: "blue",
-        LINEAR_INITIALIZATION_SET: "orange",
         LINEAR_INITIALIZATION_TRAINED: "green",
         NEURAL_OPERATOR_INITIALIZATION: "red",
+    }
+
+    initialization_name_map = {
+        LINEAR_INITIALIZATION_TRAINED: "linear initialization (pre-trained)",
+        NEURAL_OPERATOR_INITIALIZATION: "neural operator initialization",
     }
 
     def find_strictly_smaller_than_previous_vectorized(arr):
         arr = np.asarray(arr)
         if arr.size == 0:
             return np.array([]), np.array([], dtype=int)
-
-        # Compute the cumulative minimum from the left
         cummin = np.minimum.accumulate(arr)
-
-        # Create a shifted version of the cumulative min to compare against
         shifted_cummin = np.roll(cummin, 1)
-        shifted_cummin[0] = np.inf  # First element always qualifies
-
-        # Compare each element to the minimum of all previous elements
+        shifted_cummin[0] = np.inf
         mask = arr < shifted_cummin
-
         return arr[mask], np.nonzero(mask)[0]
 
     losses_by_init_and_epoch = {
@@ -194,7 +191,8 @@ def plot_validation_loss_curves(total_samples = 200, figpath = "figures/all_loss
 
     for initialization in [LINEAR_INITIALIZATION_TRAINED, NEURAL_OPERATOR_INITIALIZATION]:
         for sample_number in range(1, total_samples + 1):
-            data = np.load(f"result_data/{initialization_to_string(initialization)}/{initialization_to_string(initialization)}_{sample_number}.npz")
+            file_path = f"result_data/{initialization_to_string(initialization)}/{initialization_to_string(initialization)}_{sample_number}.npz"
+            data = np.load(file_path) # Removed file existence check
             
             reflectance_losses = data["reflectance_losses"]
             thickness_losses = data["thickness_losses"]
@@ -204,73 +202,80 @@ def plot_validation_loss_curves(total_samples = 200, figpath = "figures/all_loss
             th_dec, epochs_th_dec = find_strictly_smaller_than_previous_vectorized(thickness_losses)
             gr_dec, epochs_gr_dec = find_strictly_smaller_than_previous_vectorized(growth_rate_losses)
 
-            for epoch, val in zip(epochs_ref_dec, ref_dec):
-                losses_by_init_and_epoch[initialization]["reflectance"][epoch].append(val)
-            for epoch, val in zip(epochs_th_dec, th_dec):
-                losses_by_init_and_epoch[initialization]["thickness"][epoch].append(val)
-            for epoch, val in zip(epochs_gr_dec, gr_dec):
-                losses_by_init_and_epoch[initialization]["growth_rate"][epoch].append(val)
-
-
-            # only plot the epochs where the loss is better than all previous epochs
+            failure_thickness = 100
+            if np.min(thickness_losses) < failure_thickness: 
+                for epoch, val in zip(epochs_ref_dec, ref_dec):
+                    losses_by_init_and_epoch[initialization]["reflectance"][epoch].append(val)
+                for epoch, val in zip(epochs_th_dec, th_dec):
+                    losses_by_init_and_epoch[initialization]["thickness"][epoch].append(val)
+                for epoch, val in zip(epochs_gr_dec, gr_dec):
+                    losses_by_init_and_epoch[initialization]["growth_rate"][epoch].append(val)
 
             ax1.plot(epochs_ref_dec, ref_dec, color = initialization_colors[initialization], alpha = 0.03)
             ax2.plot(epochs_th_dec, th_dec, color = initialization_colors[initialization], alpha = 0.03)
             ax3.plot(epochs_gr_dec, gr_dec, color = initialization_colors[initialization], alpha = 0.03)
 
-
     for initialization in [LINEAR_INITIALIZATION_TRAINED, NEURAL_OPERATOR_INITIALIZATION]:
         color = initialization_colors[initialization]
+        plot_label_for_median = initialization_to_label_string(initialization) 
         
-        for loss_type, ax in zip(["reflectance", "thickness", "growth_rate"], [ax1, ax2, ax3]):
+        for loss_type_idx, (loss_type, ax) in enumerate(zip(["reflectance", "thickness", "growth_rate"], axes)):
             loss_dict = losses_by_init_and_epoch[initialization][loss_type]
             epochs = sorted(loss_dict.keys())
+            # Removed 'if not epochs: continue'
+
             medians = [np.median(loss_dict[epoch]) for epoch in epochs]
-            # apply a moving average to the medians
             smoothing_window = 100
+            # Removed conditional smoothing; always attempt convolve
+            # If len(medians) < smoothing_window, convolve with mode='valid' returns empty, plot does nothing.
             smoothed_medians = np.convolve(medians, np.ones(smoothing_window)/smoothing_window, mode='valid')
-            # adjust the epochs to match the length of the smoothed medians
-            adjusted_epochs = epochs[smoothing_window-1:]
-            # plot the smoothed medians
-            ax.plot(adjusted_epochs, smoothed_medians, label=f"smoothed median ({initialization_to_label_string(initialization)})", color=color, linewidth=2)
+            adjusted_epochs = epochs[smoothing_window-1:] # This will also be empty if smoothed_medians is empty
 
-    # manually add the legend
-    ax1.plot([], [], color = initialization_colors[LINEAR_INITIALIZATION_TRAINED], label = initialization_to_label_string(LINEAR_INITIALIZATION_TRAINED))
-    ax1.plot([], [], color = initialization_colors[NEURAL_OPERATOR_INITIALIZATION], label = initialization_to_label_string(NEURAL_OPERATOR_INITIALIZATION))
+            ax.plot(adjusted_epochs, smoothed_medians, 
+                    label=plot_label_for_median, 
+                    color=color, linewidth=2)
 
-    ax2.plot([], [], color = initialization_colors[LINEAR_INITIALIZATION_TRAINED], label = initialization_to_label_string(LINEAR_INITIALIZATION_TRAINED))
-    ax2.plot([], [], color = initialization_colors[NEURAL_OPERATOR_INITIALIZATION], label = initialization_to_label_string(NEURAL_OPERATOR_INITIALIZATION))
+    titles = ["Monotonized Reflectance Loss", "Monotonized Thickness Loss", "Monotonized Growth Rate Loss"]
+    for i, ax in enumerate(axes):
+        ax.set_yscale("log")
+        ax.set_xlabel("epoch")
+        ax.set_title(titles[i])
+        ax.set_ylabel("mean squared error")
 
-    ax3.plot([], [], color = initialization_colors[LINEAR_INITIALIZATION_TRAINED], label = initialization_to_label_string(LINEAR_INITIALIZATION_TRAINED))
-    ax3.plot([], [], color = initialization_colors[NEURAL_OPERATOR_INITIALIZATION], label = initialization_to_label_string(NEURAL_OPERATOR_INITIALIZATION))
+    legend_handles = []
+    for init_type in [LINEAR_INITIALIZATION_TRAINED, NEURAL_OPERATOR_INITIALIZATION]:
+        handle = mlines.Line2D([], [], 
+                               color=initialization_colors[init_type], 
+                               linewidth=2, 
+                               label=f"loss curves after {initialization_name_map[init_type]}, smoothed median highlighted")
+        legend_handles.append(handle)
+    
+    fig.subplots_adjust(bottom=0.20, wspace=0.20) 
 
-    # set the y axis to log scale
-    ax1.set_yscale("log")
-    ax1.set_xlabel("epoch")
-    ax1.set_ylabel("mean squared error")
-    ax1.legend(loc = "upper right")
-    ax1.set_title("monotonized reflectance loss")
+    fig.legend(handles=legend_handles, 
+               loc='lower center',
+               bbox_to_anchor=(0.5, 0.03), 
+               ncol=2, 
+               fontsize='medium')
 
-
-    # set the y axis to log scale
-    ax2.set_yscale("log")
-    ax2.set_xlabel("epoch")
-    ax2.set_ylabel("mean squared error")
-    ax2.legend(loc = "upper right")
-    ax2.set_title("monotonized thickness loss")
-
-    # set the y axis to log scale
-    ax3.set_yscale("log")
-    ax3.set_xlabel("epoch")
-    ax3.set_ylabel("mean squared error")
-    ax3.legend(loc = "upper right")
-    ax3.set_title("monotonized growth rate loss")
-
-    plt.tight_layout()
-
-    plt.savefig(figpath)
+    # Removed output directory check/creation
+    plt.savefig(
+        figpath,
+        bbox_inches='tight',
+        pad_inches=0.02
+    )
+    print(f"Validation loss curves plot saved to {figpath}")
+    # plt.show()
 
 def kde_loss_plot(total_samples = 200, figpath = "figures/losses_kde.svg"):
+    # Define the sequence of initializations (was missing in the provided snippet)
+    initializations_list = [
+        RANDOM_INITIALIZATION,
+        LINEAR_INITIALIZATION_SET,
+        LINEAR_INITIALIZATION_TRAINED,
+        NEURAL_OPERATOR_INITIALIZATION,
+    ]
+
     reflectance_losses = {
         RANDOM_INITIALIZATION: [],
         LINEAR_INITIALIZATION_SET: [],
@@ -292,6 +297,7 @@ def kde_loss_plot(total_samples = 200, figpath = "figures/losses_kde.svg"):
         NEURAL_OPERATOR_INITIALIZATION: [],
     }
 
+    # This dict seems unused in the plotting part of the snippet, but kept as is
     first_epoch_with_growth_rate_loss_below = {
         RANDOM_INITIALIZATION: [],
         LINEAR_INITIALIZATION_SET: [],
@@ -303,11 +309,18 @@ def kde_loss_plot(total_samples = 200, figpath = "figures/losses_kde.svg"):
     neural_operator_initial_losses_thickness = []
     neural_operator_initial_losses_growth_rate = []
 
-    growth_rate_loss_barrier = 5e2
+    growth_rate_loss_barrier = 5e2 # Unused in plotting part, kept as is
 
-    for initialization in initializations:
+    for initialization in initializations_list: # Use the defined list
         for sample_number in range(1, total_samples + 1):
-            data = np.load(f"result_data/{initialization_to_string(initialization)}/{initialization_to_string(initialization)}_{sample_number}.npz")
+            # Ensure result_data directory exists or handle FileNotFoundError
+            file_path = f"result_data/{initialization_to_string(initialization)}/{initialization_to_string(initialization)}_{sample_number}.npz"
+            try:
+                data = np.load(file_path)
+            except FileNotFoundError:
+                print(f"Warning: File not found {file_path}, skipping sample.")
+                continue
+
 
             reflectance_losses[initialization].append(data["reflectance_loss"])
             thickness_losses[initialization].append(data["thickness_loss"])
@@ -317,46 +330,29 @@ def kde_loss_plot(total_samples = 200, figpath = "figures/losses_kde.svg"):
                 neural_operator_initial_losses_reflectance.append(data["initial_reflectance_loss"])
                 neural_operator_initial_losses_thickness.append(data["initial_thickness_loss"])
                 neural_operator_initial_losses_growth_rate.append(data["initial_growth_rate_loss"])
+            
+            # Logic for first_epoch_with_growth_rate_loss_below (kept as is)
+            if "growth_rate_losses" in data: # Check if key exists
+                lower_than_barrier = data["growth_rate_losses"] < growth_rate_loss_barrier
+                if np.any(lower_than_barrier):
+                    first_epoch = np.argmax(lower_than_barrier)
+                else:
+                    first_epoch = len(data["growth_rate_losses"])
+                first_epoch_with_growth_rate_loss_below[initialization].append(first_epoch)
+            else: # Handle cases where 'growth_rate_losses' might be missing
+                first_epoch_with_growth_rate_loss_below[initialization].append(np.nan) # Or some other placeholder
 
-            # find the first epoch (so the first index) with growth rate loss below the barrier
-            lower_than_barrier = data["growth_rate_losses"] < growth_rate_loss_barrier
 
-            if np.any(lower_than_barrier):
-                first_epoch = np.argmax(lower_than_barrier)
-            else:
-                first_epoch = len(data["growth_rate_losses"])
-                    
-            first_epoch_with_growth_rate_loss_below[initialization].append(
-                first_epoch
-            )
-        
-        # for the initialization, plot the number of MSE thickness losses above 100
-        # and their fraction of the total number of samples
         reflectance_losses[initialization] = np.array(reflectance_losses[initialization])
         thickness_losses[initialization] = np.array(thickness_losses[initialization])
         growth_rate_losses[initialization] = np.array(growth_rate_losses[initialization])
-        # print the number of samples with thickness loss above 100
+        
         num_samples_above_100 = np.sum(thickness_losses[initialization] > 100)
-        # print the fraction of samples with thickness loss above 100
-        fraction_samples_above_100 = num_samples_above_100 / total_samples
+        if total_samples > 0 : # Avoid division by zero if no samples loaded
+            fraction_samples_above_100 = num_samples_above_100 / len(thickness_losses[initialization]) if len(thickness_losses[initialization]) > 0 else 0
+        else:
+            fraction_samples_above_100 = 0
         print(f"Initialization {initialization_to_string(initialization)}: {num_samples_above_100} samples above 100 thicknes MSE, fraction: {fraction_samples_above_100:.2f}")
-
-
-    # # Example: KDE plot of growth_rate_losses with log scale on x-axis
-    # plt.figure(figsize=(6, 4))
-
-    # for initialization in initializations:
-    #     losses = np.array(growth_rate_losses[initialization])
-    #     # Filter out zeros or negative values since log-scale can't handle them
-    #     losses = losses[losses > 0]
-    #     sns.kdeplot(losses, label=initialization_to_string(initialization), log_scale=True)
-
-    # plt.xlabel("Growth Rate Loss (log scale)")
-    # plt.ylabel("Density")
-    # plt.title("KDE of Growth Rate Losses")
-    # plt.legend()
-    # plt.tight_layout()
-    # plt.savefig("figures/growth_rate_losses_kde.svg")
 
     initialization_colors = {
         RANDOM_INITIALIZATION: "blue",
@@ -364,85 +360,110 @@ def kde_loss_plot(total_samples = 200, figpath = "figures/losses_kde.svg"):
         LINEAR_INITIALIZATION_TRAINED: "green",
         NEURAL_OPERATOR_INITIALIZATION: "red",
     }
+    
+    # Labels for the legend
+    legend_labels = {
+        RANDOM_INITIALIZATION: "optimization result after random initialization",
+        LINEAR_INITIALIZATION_SET: "optimization result after linear initialization (set)",
+        LINEAR_INITIALIZATION_TRAINED: "optimization result after linear initialization (pre-trained)",
+        NEURAL_OPERATOR_INITIALIZATION: "optimization result after neural operator initialization",
+        "NEURAL_OPERATOR_GUESS": "neural operator initial guess"
+    }
 
-
-    fig, axes = plt.subplots(3, 1, figsize=(6, 9))  # 3 rows, 1 column
+    fig, axes = plt.subplots(1, 3, figsize=(18, 5))  # 1 row, 3 columns
 
     loss_dicts = [reflectance_losses, thickness_losses, growth_rate_losses]
+    initial_loss_lists = [
+        neural_operator_initial_losses_reflectance,
+        neural_operator_initial_losses_thickness,
+        neural_operator_initial_losses_growth_rate
+    ]
     titles = ["Reflectance Loss", "Thickness Loss", "Growth Rate Loss"]
+    x_labels_list = ["mean squared reflectance error (unitless)",
+                     "mean squared thickness error in nm²",
+                     "mean squared growth rate error in nm²/h²"]
 
-    for ax, loss_dict, title in zip(axes, loss_dicts, titles):
-        for init in initializations:
-            data = np.array(loss_dict[init])
+    for i, ax in enumerate(axes):
+        loss_dict = loss_dicts[i]
+        title = titles[i]
+        initial_losses_for_plot = initial_loss_lists[i]
+
+        for init_type in initializations_list:
+            data = np.array(loss_dict[init_type])
             data = data[data > 0]  # log scale requires positive values
-            sns.kdeplot(data, ax=ax, label=initialization_to_label_string(init), bw_adjust = 0.5, log_scale = True, color = initialization_colors[init])
-            sns.rugplot(data, ax=ax, height = 0.03, lw = 0.1, alpha = 0.5, color = initialization_colors[init])
+            if len(data) > 0: # Check if data is not empty after filtering
+                sns.kdeplot(data, ax=ax, label=legend_labels[init_type], bw_adjust = 0.5, log_scale = True, color = initialization_colors[init_type])
+                sns.rugplot(data, ax=ax, height = 0.03, lw = 0.1, alpha = 0.5, color = initialization_colors[init_type])
 
-    # add the neural operator initial losses
-    sns.kdeplot(
-        np.array(neural_operator_initial_losses_reflectance),
-        ax=axes[0],
-        label="neural operator guess loss",
-        bw_adjust=0.5,
-        log_scale=True,
-        color="black",
-    )
-    sns.kdeplot(
-        np.array(neural_operator_initial_losses_thickness),
-        ax=axes[1],
-        label="neural operator guess loss",
-        bw_adjust=0.5,
-        log_scale=True,
-        color="black",
-    )
-    sns.kdeplot(
-        np.array(neural_operator_initial_losses_growth_rate),
-        ax=axes[2],
-        label="neural operator guess loss",
-        bw_adjust=0.5,
-        log_scale=True,
-        color="black",
-    )
-    # add the rugplot for the neural operator initial losses
-    sns.rugplot(
-        np.array(neural_operator_initial_losses_reflectance),
-        ax=axes[0],
-        height=0.03,
-        lw=0.1,
-        alpha=0.5,
-        color="black",
-    )
-    sns.rugplot(
-        np.array(neural_operator_initial_losses_thickness),
-        ax=axes[1],
-        height=0.03,
-        lw=0.1,
-        alpha=0.5,
-        color="black",
-    )
-    sns.rugplot(
-        np.array(neural_operator_initial_losses_growth_rate),
-        ax=axes[2],
-        height=0.03,
-        lw=0.1,
-        alpha=0.5,
-        color="black",
-    )
+        # Add the neural operator initial losses
+        initial_data = np.array(initial_losses_for_plot)
+        initial_data = initial_data[initial_data > 0]
+        if len(initial_data) > 0:
+            sns.kdeplot(
+                initial_data,
+                ax=ax,
+                label=legend_labels["NEURAL_OPERATOR_GUESS"],
+                bw_adjust=0.5,
+                log_scale=True,
+                color="black",
+            )
+            sns.rugplot(
+                initial_data,
+                ax=ax,
+                height=0.03,
+                lw=0.1,
+                alpha=0.5,
+                color="black",
+            )
 
-    for ax, loss_dict, title in zip(axes, loss_dicts, titles):
         ax.set_xscale("log")
         ax.set_title(title)
+        ax.set_xlabel(x_labels_list[i])
+        # if i == 0:
         ax.set_ylabel("probability density")
-        ax.legend()
+        # else:
+        #     ax.set_yticklabels([]) # Hide y-tick labels for middle and right plots
 
-    axes[0].set_xlabel("mean squared reflectance error (unitless)")
-    axes[1].set_xlabel("mean squared thickness error in nm²")
-    axes[2].set_xlabel("mean squared growth rate error in nm²/h²")
-
-
-    # set upper x limit of ax 1 and 2 to 10^8
+    # Set specific xlims (as in original)
     axes[1].set_xlim(right=1e8)
     axes[2].set_xlim(right=1e8)
 
-    plt.tight_layout()
-    plt.savefig(figpath)
+    axes[0].set_ylim(top=1.1)
+    axes[1].set_ylim(top=1.0)
+    axes[2].set_ylim(top=1.5)
+
+    # --- Common Legend (Manually Created for 1,2,2 column structure) ---
+    h_no_guess = mlines.Line2D([], [], color='black', label=legend_labels["NEURAL_OPERATOR_GUESS"])
+    h_opt_random = mlines.Line2D([], [], color=initialization_colors[RANDOM_INITIALIZATION], label=legend_labels[RANDOM_INITIALIZATION])
+    h_opt_linear_set = mlines.Line2D([], [], color=initialization_colors[LINEAR_INITIALIZATION_SET], label=legend_labels[LINEAR_INITIALIZATION_SET])
+    h_opt_linear_trained = mlines.Line2D([], [], color=initialization_colors[LINEAR_INITIALIZATION_TRAINED], label=legend_labels[LINEAR_INITIALIZATION_TRAINED])
+    h_opt_no_init = mlines.Line2D([], [], color=initialization_colors[NEURAL_OPERATOR_INITIALIZATION], label=legend_labels[NEURAL_OPERATOR_INITIALIZATION])
+    
+    h_dummy = mlines.Line2D([], [], color='none', marker='None', linestyle='None', label=' ') 
+
+    legend_handles_ordered = [
+        h_no_guess,             # Col 1, Row 1
+        h_dummy, 
+        h_opt_random,   
+        h_opt_linear_set,          # Col 2, Row 1
+        h_opt_linear_trained,   # Col 3, Row 1
+               # Col 1, Row 2 (placeholder)
+             # Col 2, Row 2
+        h_opt_no_init           # Col 3, Row 2
+    ]
+    
+    fig.subplots_adjust(bottom=0.25, wspace=0.25) # Adjust bottom for legend and wspace
+
+    fig.legend(handles=legend_handles_ordered, 
+               loc='lower center',
+               bbox_to_anchor=(0.5, 0.03), 
+               ncol=3, 
+               fontsize='medium')
+
+        
+    plt.savefig(
+        figpath,
+        bbox_inches='tight',
+        pad_inches=0.02
+    )
+    print(f"KDE plot saved to {figpath}")

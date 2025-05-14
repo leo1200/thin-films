@@ -13,9 +13,9 @@ from reflax.constants import ONE_LAYER_MODEL, TRANSFER_MATRIX_METHOD
 # plot_all_validation_results()
 
 # single sample initialization comparison
-plot_single_sample_initialization_comparison()
+# plot_single_sample_initialization_comparison()
 
-# # plot the loss over epochs for the validation set
+# plot the loss over epochs for the validation set
 # print("🖼️: generating plot for the loss over epochs...")
 # plot_validation_loss_curves(figpath = "figures/validation_losses_over_epochs.svg")
 
@@ -33,8 +33,8 @@ plot_single_sample_initialization_comparison()
 
 # same example optimization with transfer matrix method
 # 14k epochs took 314s on an A100 GPU
-optimize_single_example(
-    model = TRANSFER_MATRIX_METHOD,
-    result_title = "transfer_matrix_example",
-    loss_over_epoch_title = "transfer_matrix_loss_over_epoch",
-)
+# optimize_single_example(
+#     model = TRANSFER_MATRIX_METHOD,
+#     result_title = "transfer_matrix_example",
+#     loss_over_epoch_title = "transfer_matrix_loss_over_epoch",
+# )
