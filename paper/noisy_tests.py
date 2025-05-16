@@ -23,7 +23,7 @@ initialized_thicknessA = data["initialized_thicknessA"]
 initialized_growth_rateA = data["initialized_growth_rateA"]
 initialized_time_pointsA = data["initialized_time_pointsA"]
 time_points_initialized = jnp.linspace(0, 1, initialized_reflectanceA.shape[0])
-snr_dbA = data["snr_dbA"]
+snr_dbA = data["snr_dbA"] * 2
 true_reflectanceB = data["true_reflectanceB"]
 true_thicknessB = data["true_thicknessB"]
 true_growth_rateB = data["true_growth_rateB"]
@@ -34,7 +34,7 @@ initialized_reflectanceB = data["initialized_reflectanceB"]
 initialized_thicknessB = data["initialized_thicknessB"]
 initialized_growth_rateB = data["initialized_growth_rateB"]
 initialized_time_pointsB = data["initialized_time_pointsB"]
-snr_dbB = data["snr_dbB"]
+snr_dbB = data["snr_dbB"] * 2
 true_reflectanceC = data["true_reflectanceC"]
 true_thicknessC = data["true_thicknessC"]
 true_growth_rateC = data["true_growth_rateC"]
@@ -45,7 +45,7 @@ initialized_reflectanceC = data["initialized_reflectanceC"]
 initialized_thicknessC = data["initialized_thicknessC"]
 initialized_growth_rateC = data["initialized_growth_rateC"]
 initialized_time_pointsC = data["initialized_time_pointsC"]
-snr_dbC = data["snr_dbC"]
+snr_dbC = data["snr_dbC"] * 2
 
 # Calculate ABSOLUTE thickness errors
 thickness_abs_errorA = jnp.abs(true_thicknessA - predicted_thicknessA)
@@ -79,7 +79,7 @@ ax32 = fig.add_subplot(gs[3, 2]) # Row 3, Col 2: Growth Rate C
 
 # Row 0: Reflectance A
 ax00.plot(time_points_true, true_reflectanceA, label = "measured reflectance", color = "blue", alpha = 0.5)
-ax00.plot(time_points_true, predicted_reflectanceA, label = "predicted reflectance", color = "red", alpha = 0.5)
+ax00.plot(time_points_true, predicted_reflectanceA, label = "predicted reflectance\nafter optimization", color = "red", alpha = 0.5)
 ax00.set_ylabel("normalized reflectance")
 ax00.legend(loc = "upper right")
 ax00.set_title("Reflectance (SNR = " + "{:.2f}".format(snr_dbA) + " dB)")
@@ -87,8 +87,8 @@ ax00.tick_params(axis='x', labelbottom=False) # Hide x-axis labels
 
 # Row 1: Thickness A
 ax10.plot(time_points_true, true_thicknessA, label = "true thickness", color = "blue", alpha = 0.5)
-ax10.plot(time_points_true, predicted_thicknessA, label = "predicted thickness", color = "red", alpha = 0.5)
-ax10.plot(initialized_time_pointsA, initialized_thicknessA, label = "initial prediction", linestyle = "--", color = "green", alpha = 0.5)
+ax10.plot(time_points_true, predicted_thicknessA, label = "predicted thickness\nafter optimization", color = "red", alpha = 0.5)
+ax10.plot(initialized_time_pointsA, initialized_thicknessA, label = "neural operator initialization", linestyle = "--", color = "green", alpha = 0.5)
 ax10.set_ylabel("thickness in nm")
 ax10.legend(loc = "upper right")
 ax10.set_title("Thickness Prediction")
@@ -105,8 +105,8 @@ ax20.tick_params(axis='x', labelbottom=False) # Hide x-axis labels
 
 # Row 3: Growth Rate A
 ax30.plot(time_points_true, true_growth_rateA, label = "true growth rate", color = "blue", alpha = 0.5)
-ax30.plot(time_points_true, predicted_growth_rateA, label = "predicted growth rate", color = "red", alpha = 0.5)
-ax30.plot(initialized_time_pointsA, initialized_growth_rateA, label = "initial prediction", linestyle = "--", color = "green", alpha = 0.5)
+ax30.plot(time_points_true, predicted_growth_rateA, label = "predicted growth rate\nafter optimization", color = "red", alpha = 0.5)
+ax30.plot(initialized_time_pointsA, initialized_growth_rateA, label = "neural operator initialization", linestyle = "--", color = "green", alpha = 0.5)
 ax30.set_xlabel("time in hours") # Add x-label only to the bottom plot
 ax30.set_ylabel("growth rate in nm/h")
 ax30.legend(loc = "lower right")
@@ -117,7 +117,7 @@ ax30.set_title("Growth Rate Prediction")
 
 # Row 0: Reflectance B
 ax01.plot(time_points_true, true_reflectanceB, label = "measured reflectance", color = "blue", alpha = 0.5)
-ax01.plot(time_points_true, predicted_reflectanceB, label = "predicted reflectance", color = "red", alpha = 0.5)
+ax01.plot(time_points_true, predicted_reflectanceB, label = "predicted reflectance\nafter optimization", color = "red", alpha = 0.5)
 # ax01.set_ylabel("normalized reflectance")
 ax01.legend(loc = "upper right")
 ax01.set_title("Reflectance (SNR = " + "{:.2f}".format(snr_dbB) + " dB)")
@@ -125,8 +125,8 @@ ax01.tick_params(axis='x', labelbottom=False)
 
 # Row 1: Thickness B
 ax11.plot(time_points_true, true_thicknessB, label = "true thickness", color = "blue", alpha = 0.5)
-ax11.plot(time_points_true, predicted_thicknessB, label = "predicted thickness", color = "red", alpha = 0.5)
-ax11.plot(initialized_time_pointsB, initialized_thicknessB, label = "initial prediction", linestyle = "--", color = "green", alpha = 0.5)
+ax11.plot(time_points_true, predicted_thicknessB, label = "predicted thickness\nafter optimization", color = "red", alpha = 0.5)
+ax11.plot(initialized_time_pointsB, initialized_thicknessB, label = "neural operator initialization", linestyle = "--", color = "green", alpha = 0.5)
 # ax11.set_ylabel("thickness in nm")
 ax11.legend(loc = "upper right")
 ax11.set_title("Thickness Prediction")
@@ -143,8 +143,8 @@ ax21.tick_params(axis='x', labelbottom=False)
 
 # Row 3: Growth Rate B
 ax31.plot(time_points_true, true_growth_rateB, label = "true growth rate", color = "blue", alpha = 0.5)
-ax31.plot(time_points_true, predicted_growth_rateB, label = "predicted growth rate", color = "red", alpha = 0.5)
-ax31.plot(initialized_time_pointsB, initialized_growth_rateB, label = "initial prediction", linestyle = "--", color = "green", alpha = 0.5)
+ax31.plot(time_points_true, predicted_growth_rateB, label = "predicted growth rate\nafter optimization", color = "red", alpha = 0.5)
+ax31.plot(initialized_time_pointsB, initialized_growth_rateB, label = "neural operator initialization", linestyle = "--", color = "green", alpha = 0.5)
 ax31.set_xlabel("time in hours")
 # ax31.set_ylabel("growth rate in nm/h")
 ax31.legend(loc = "lower right")
@@ -155,7 +155,7 @@ ax31.set_title("Growth Rate Prediction")
 
 # Row 0: Reflectance C
 ax02.plot(time_points_true, true_reflectanceC, label = "measured reflectance", color = "blue", alpha = 0.5)
-ax02.plot(time_points_true, predicted_reflectanceC, label = "predicted reflectance", color = "red", alpha = 0.5)
+ax02.plot(time_points_true, predicted_reflectanceC, label = "predicted reflectance\nafter optimization", color = "red", alpha = 0.5)
 # ax02.set_ylabel("reflectance")
 ax02.legend(loc = "upper right")
 ax02.set_title("Reflectance (SNR = " + "{:.2f}".format(snr_dbC) + " dB)")
@@ -163,8 +163,8 @@ ax02.tick_params(axis='x', labelbottom=False)
 
 # Row 1: Thickness C
 ax12.plot(time_points_true, true_thicknessC, label = "true thickness", color = "blue", alpha = 0.5)
-ax12.plot(time_points_true, predicted_thicknessC, label = "predicted thickness", color = "red", alpha = 0.5)
-ax12.plot(initialized_time_pointsC, initialized_thicknessC, label = "initial prediction", linestyle = "--", color = "green", alpha = 0.5)
+ax12.plot(time_points_true, predicted_thicknessC, label = "predicted thickness\nafter optimization", color = "red", alpha = 0.5)
+ax12.plot(initialized_time_pointsC, initialized_thicknessC, label = "neural operator initialization", linestyle = "--", color = "green", alpha = 0.5)
 # ax12.set_ylabel("thickness in nm")
 ax12.legend(loc = "upper right")
 ax12.set_title("Thickness Prediction")
@@ -181,8 +181,8 @@ ax22.tick_params(axis='x', labelbottom=False)
 
 # Row 3: Growth Rate C
 ax32.plot(time_points_true, true_growth_rateC, label = "true growth rate", color = "blue", alpha = 0.5)
-ax32.plot(time_points_true, predicted_growth_rateC, label = "predicted growth rate", color = "red", alpha = 0.5)
-ax32.plot(initialized_time_pointsC, initialized_growth_rateC, label = "initial prediction", linestyle = "--", color = "green", alpha = 0.5)
+ax32.plot(time_points_true, predicted_growth_rateC, label = "predicted growth rate\nafter optimization", color = "red", alpha = 0.5)
+ax32.plot(initialized_time_pointsC, initialized_growth_rateC, label = "neural operator initialization", linestyle = "--", color = "green", alpha = 0.5)
 ax32.set_xlabel("time in hours")
 # ax32.set_ylabel("growth rate in nm/h")
 ax32.legend(loc = "lower right")

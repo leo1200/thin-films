@@ -155,19 +155,19 @@ def plot_single_sample_initialization_comparison():
 
     # --- Section 1: Reflectance ---
     gs_inner1 = gridspec.GridSpecFromSubplotSpec(2, 1, subplot_spec=gs_outer[0, 0],
-                                                height_ratios=[3, 1], hspace=0.1)
+                                                height_ratios=[2, 1], hspace=0.1)
     ax1_main = fig.add_subplot(gs_inner1[0])
     ax1_err = fig.add_subplot(gs_inner1[1], sharex=ax1_main)
 
     # --- Section 2: Thickness ---
     gs_inner2 = gridspec.GridSpecFromSubplotSpec(2, 1, subplot_spec=gs_outer[0, 1],
-                                                height_ratios=[3, 1], hspace=0.1)
+                                                height_ratios=[2, 1], hspace=0.1)
     ax2_main = fig.add_subplot(gs_inner2[0])
     ax2_err = fig.add_subplot(gs_inner2[1], sharex=ax2_main)
 
     # --- Section 3: Growth Rate ---
     gs_inner3 = gridspec.GridSpecFromSubplotSpec(2, 1, subplot_spec=gs_outer[0, 2],
-                                                height_ratios=[3, 1], hspace=0.1)
+                                                height_ratios=[2, 1], hspace=0.1)
     ax3_main = fig.add_subplot(gs_inner3[0])
     ax3_err = fig.add_subplot(gs_inner3[1], sharex=ax3_main)
 

@@ -34,8 +34,8 @@ def plot_validation_and_train_data(figpath="figures/train_val_data.png"):
     val_color = "orange"
 
     # Plot reflectance
-    ax1.plot(time_points_train, reflectances_train.T, alpha=0.004, color=train_color)
-    ax1.plot(time_points_val, reflectances_val.T, alpha=0.01, color=val_color)
+    ax1.plot(time_points_train, reflectances_train.T, alpha=0.002, color=train_color)
+    ax1.plot(time_points_val, reflectances_val.T, alpha=0.03, color=val_color)
     ax1.plot(time_points_train, reflectances_train[example_index_train], alpha=1.0, label="training data", color=train_color)
     ax1.plot(time_points_val, reflectances_val[example_index_val], alpha=1.0, label="validation data", color=val_color)
     ax1.legend(loc="upper right")
@@ -43,8 +43,8 @@ def plot_validation_and_train_data(figpath="figures/train_val_data.png"):
     ax1.set_ylabel("normalized reflectance")
 
     # Plot thickness
-    ax2.plot(time_points_train, thicknesses_train.T, alpha=0.004, color=train_color)
-    ax2.plot(time_points_val, thicknesses_val.T, alpha=0.01, color=val_color)
+    ax2.plot(time_points_train, thicknesses_train.T, alpha=0.002, color=train_color)
+    ax2.plot(time_points_val, thicknesses_val.T, alpha=0.03, color=val_color)
     ax2.plot(time_points_train, thicknesses_train[example_index_train], alpha=1.0, label="training data", color=train_color)
     ax2.plot(time_points_val, thicknesses_val[example_index_val], alpha=1.0, label="validation data", color=val_color)
     ax2.legend(loc="lower right")
@@ -52,8 +52,8 @@ def plot_validation_and_train_data(figpath="figures/train_val_data.png"):
     ax2.set_ylabel("thickness in nm")
 
     # Plot first derivative
-    ax3.plot(time_points_train, derivatives_train.T, alpha=0.004, color=train_color)
-    ax3.plot(time_points_val, derivatives_val.T, alpha=0.01, color=val_color)
+    ax3.plot(time_points_train, derivatives_train.T, alpha=0.002, color=train_color)
+    ax3.plot(time_points_val, derivatives_val.T, alpha=0.03, color=val_color)
     ax3.plot(time_points_train, derivatives_train[example_index_train], alpha=1.0, label="training data", color=train_color)
     ax3.plot(time_points_val, derivatives_val[example_index_val], alpha=1.0, label="validation data", color=val_color)
     ax3.legend(loc="lower right")

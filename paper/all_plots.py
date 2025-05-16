@@ -6,7 +6,7 @@ from reflax.constants import ONE_LAYER_MODEL, TRANSFER_MATRIX_METHOD
 
 # plot the validation and training data
 # print("🖼️: plotting validation and train data...")
-# plot_validation_and_train_data(figpath = "figures/train_val_data.png")
+plot_validation_and_train_data(figpath = "figures/train_val_data.png")
 
 # # generate all plots of the validation results
 # print("🖼️: generating plots for all validation results...")

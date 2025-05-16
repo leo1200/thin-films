@@ -12,7 +12,7 @@ sys.path.insert(0, os.path.abspath('../../reflax'))  # Source code dir relative 
 
 project = 'reflax'
 copyright = '2024'
-author = 'Gunnar Ehlers and Leonard Storcks at <a href="https://astroai-lab.de/index.html">AstroAi Lab</a>.'
+author = 'anonymous authors'
 
 # -- General configuration ---------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#general-configuration

@@ -2,7 +2,7 @@
 name = "reflax"
 version = "0.0.3"
 description = "TODO"
-authors = ["Gunnar Ehlers", "Leonard Storcks"]
+authors = ["anonymous authors"]
 readme = "README.md"
 packages = [{include = "reflax"}]
 
