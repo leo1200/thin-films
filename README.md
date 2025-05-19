@@ -1,4 +1,6 @@
 # reflax - Differentiable Interference Modeling for Cost-Effective Growth Estimation of Thin Films
+
+![reflax](logo.svg)
  
 > The results from the paper can be reproduced using the scripts in the `paper` folder.
 
