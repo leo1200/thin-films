@@ -5,14 +5,14 @@ import seaborn as sns
 
 def plot_validation_and_train_data(figpath="figures/train_val_data.png"):
     # Load the training data
-    data_train = np.load("training_data/training_data.npz")
+    data_train = np.load("simulated_data/training_data.npz")
     thicknesses_train = data_train["thicknesses"]#[100:, :]
     derivatives_train = data_train["derivatives"]#[100:, :]
     reflectances_train = data_train["reflectances"]#[100:, :]
     time_points_train = data_train["time_points"]
 
     # Load the validation data
-    data_val = np.load("training_data/validation_data.npz")
+    data_val = np.load("simulated_data/validation_data.npz")
     thicknesses_val = data_val["thicknesses"]
     derivatives_val = data_val["derivatives"]
     reflectances_val = data_val["reflectances"]

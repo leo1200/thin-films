@@ -1,7 +1,6 @@
 # reflax - Differentiable Interference Modeling for Cost-Effective Growth Estimation of Thin Films
-
-> [!NOTE]  
-> The results from the paper can be reproduced using the scripts in the `paper` folder. We are still in the process of cleaning up these scripts until the supplemental material deadline (May 22 '25 (Anywhere on Earth)).
+ 
+> The results from the paper can be reproduced using the scripts in the `paper` folder.
 
 `reflax` is an open-source `JAX` library for inferring thin film growth behavior, featuring differentiable interference forward models
 
@@ -23,5 +22,28 @@ which can be used to generate training data for
 
 which may be used as an initialization in the optimization of the thickness model through the differentiable interference forward model.
 
-## Short Documentation
-TODO: add short documentation here
+
+## Installation
+
+
+## Forward modeling: thickness time series → reflectance time series
+
+### Setting up the forward model
+
+### Generating an examplary thickness time series
+
+### Running the forward model
+
+
+## Inverse modeling: reflectance time series → thickness time series
+
+In the following, we will show how you can from a single wavelength reflectance time series of a growing thin film infer the thickness time series.
+
+> Note that here we consider inference under a given experimental setup with known refractive index of the thin layer. While the refractive index could also be inferred, we have not yet adapted our pipeline accordingly.
+
+### Training a neural operator for inferring the thickness time series
+
+> Note that the aforementioned neural operator initialization requires a known given total duration of the growth process and fixed experimental setup - but the neural operator can be trained very quickly (sub 30 seconds on an NVIDIA A100) so this is not much of a limitation.
+
+
+### Inferring the thickness time series by optimization through the differentiable simulator
