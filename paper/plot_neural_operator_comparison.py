@@ -1,5 +1,3 @@
-import os
-
 import matplotlib.pyplot as plt
 import numpy as np
 import seaborn as sns
@@ -24,12 +22,10 @@ def plot_combined_loss_and_mse_kde(
     histories: dict[str, list],
     preds_dict: dict[str, np.ndarray],
     targets_dict: dict[str, np.ndarray],
-    out_dir: str,
-    fig_name: str = "combined_loss_mse.svg",
+    fig_path: str,
 ):
 
     sns.set_theme(style="ticks", context="paper", font_scale=1.1)
-    os.makedirs(out_dir, exist_ok=True)
 
     models = list(histories.keys())
     fig, (ax0, ax1) = plt.subplots(
@@ -148,5 +144,5 @@ def plot_combined_loss_and_mse_kde(
         bbox_to_anchor=(0.5, -0.15),
     )
 
-    fig.savefig(os.path.join(out_dir, fig_name), bbox_inches="tight")
+    fig.savefig(fig_path, bbox_inches="tight", dpi=300)
     plt.close(fig)

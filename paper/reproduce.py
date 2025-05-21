@@ -7,10 +7,20 @@ Main reproduction script.
 # autocvd(num_gpus = 1)
 import os
 
-os.environ["CUDA_VISIBLE_DEVICES"] = "5"
+os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
+
+# = Change dir to paper =
+if os.getcwd() != os.path.dirname(os.path.abspath(__file__)):
+    os.chdir(os.path.dirname(os.path.abspath(__file__)))
+    print(f"Changed working directory to {os.getcwd()}")
 # =======================
 
-from analyze_all_validation_samples import analyze_all_validation_samples
+# == Make figures  dir ==
+if not os.path.exists("figures"):
+    os.makedirs("figures")
+# =======================
+
+# from analyze_all_validation_samples import analyze_all_validation_samples
 from analyze_measurement import analyze_measurement
 from compare_neural_operators import neural_operator_comparison
 from generate_training_data import generate_training_data

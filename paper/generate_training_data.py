@@ -3,22 +3,20 @@
 # autocvd(num_gpus = 1)
 # # =======================
 
-import jax.numpy as jnp
 import jax
-
+import jax.numpy as jnp
 # NOTE: without 64-bit precision,
 # the Cholesky decomposition fails
 from jax import config
+
 config.update("jax_enable_x64", True)
 
-from reflax.forward_model.forward_model import batched_forward_model
-
 # constants
-from reflax import (
-    ONE_LAYER_MODEL,
-)
+from reflax import ONE_LAYER_MODEL
+from reflax.forward_model.forward_model import batched_forward_model
+from reflax.thickness_modeling.function_sampling import (
+    sample_derivative_bound_gp, sample_linear_functions)
 
-from reflax.thickness_modeling.function_sampling import sample_derivative_bound_gp, sample_linear_functions
 
 def generate_training_data(training_data_path = "simulated_data/training_data.npz"):
 

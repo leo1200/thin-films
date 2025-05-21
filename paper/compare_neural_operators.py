@@ -1,36 +1,51 @@
 import os
 
-import yaml
+import torch
+from plot_neural_operator_comparison import plot_combined_loss_and_mse_kde
 
 from reflax.neural_operators.models import AbstractSurrogate
 from reflax.neural_operators.training import load_dataset
 
-from .plot_neural_operator_comparison import plot_combined_loss_and_mse_kde
+CFG = {
+    "archs": [
+        "direct_fcnn",
+        "direct_fcnn_plain",
+        "deeponet",
+        "operator_fcnn",
+    ],
+    "batch_sizes": [256, 256, 16384, 16384],
+}
 
 
 def neural_operator_comparison():
-    cfg = yaml.safe_load(open("config.yaml"))
-    ds = cfg["dataset_name"]
-    tid = cfg.get("training_id", ds)
-    device = cfg.get("device", "cpu")
-    archs = cfg["architectures"]
-    batches = cfg["batch_sizes"]
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+    archs = CFG["archs"]
+    batches = CFG["batch_sizes"]
 
-    _, _, _, _, val_in, val_out = load_dataset(ds)
+    # We use the full validation set for evaluation
+    _, _, _, _, val_in, val_out = load_dataset(
+        filepath="simulated_data/validation_data.npz", splits=(0.0, 0.0, 1.0)
+    )
+
+    # Downsample the validation set to the 100 timestepds used for training
+    val_in = val_in[:, ::4]
+    val_out = val_out[:, ::4]
 
     histories = {}
     report_evers = {}
     preds_dict = {}
     targets_dict = {}
 
+    n_evals = val_in.shape[1]
+
     for name, batch in zip(archs, batches):
-        print(f"→ Evaluating {name}")
+        print(f"→ Evaluating {name}s")
 
         model = AbstractSurrogate.load(
             surrogate_name=name,
-            dataset_name=ds,
-            training_id=tid,
             device=device,
+            n_evals=n_evals,
+            path=os.path.join(os.getcwd(), "neural_operator_models", f"{name}.pth"),
         )
 
         histories[name] = getattr(model, "test_hist", [])
@@ -54,16 +69,12 @@ def neural_operator_comparison():
         preds_dict[name] = preds
         targets_dict[name] = targets
 
-        out_dir = os.path.join("results", tid, name)
-        os.makedirs(out_dir, exist_ok=True)
-
-    comp_dir = os.path.join("results", tid, "comparative")
-    os.makedirs(comp_dir, exist_ok=True)
+    figpath = "figures/neural_operator_comparison.svg"
 
     x_all = {
         name: [(i + 1) * report_evers[name] for i in range(len(histories[name]))]
         for name in archs
     }
 
-    plot_combined_loss_and_mse_kde(x_all, histories, preds_dict, targets_dict, comp_dir)
+    plot_combined_loss_and_mse_kde(x_all, histories, preds_dict, targets_dict, figpath)
     print("→ Evaluation complete!")

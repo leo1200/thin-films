@@ -4,7 +4,7 @@ import seaborn as sns
 from matplotlib import gridspec
 
 
-def plot_validation_and_train_data(figpath="figures/train_val_data.png"):
+def plot_validation_and_train_data(figpath="figures/train_val_data.svg"):
     # Load the training data
     data_train = np.load("simulated_data/training_data.npz")
     thicknesses_train = data_train["thicknesses"]  # [100:, :]
