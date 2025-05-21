@@ -2,7 +2,8 @@
 
 ![reflax](logo.svg)
  
-> The results from the paper can be reproduced using the scripts in the [`paper`](paper/) folder, to regenerate all figures, have a look at [`paper/reproduce.py`](paper/reproduce.py). There we have also annotated which function creates which figure in the paper.
+> The results from the paper can be reproduced using the scripts in the [`paper`](paper/) folder, to regenerate all figures, have a look at [`paper/reproduce.py`](paper/reproduce.py). There we have also annotated which function creates which figure in the paper. To run this script, you need to have a working environment with the required dependencies in place. These can be installed either from the `requirements.txt` file or by using poetry to install the dependencies listed in the `pyproject.toml` file.
+
 
 `reflax` is an open-source `JAX` library for inferring thin film growth behavior, featuring differentiable interference forward models
 

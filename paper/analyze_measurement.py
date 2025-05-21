@@ -4,47 +4,39 @@
 # # =======================
 
 import jax
-import numpy as np
-
 import jax.numpy as jnp
-from flax import nnx
-from reflax.thickness_modeling.operator_learning import (
-    NeuralOperatorMLP,
-    load_model,
-)
-
-from train_neural_operator import neural_operator_training
-
 import matplotlib.pyplot as plt
-
-from matplotlib import gridspec
-
+import numpy as np
+from flax import nnx
 
 # NOTE: without 64-bit precision,
 # the Cholesky decomposition fails
 from jax import config
+from matplotlib import gridspec
+from train_neural_operator import neural_operator_training
+
+from reflax.thickness_modeling.operator_learning import NeuralOperatorMLP, load_model
+
 config.update("jax_enable_x64", True)
 
 import matplotlib.pyplot as plt
 
-# constants
-from reflax import (
-    ONE_LAYER_MODEL
-)
-
-
-from reflax.forward_model.forward_model import batched_forward_model
-from reflax.thickness_modeling.nn_modeling import RawGrowthNN, predict_growth_rate, predict_thickness, pretrained_initialization, train_nn_model
-
 # forward model
-from reflax import (
-    forward_model
-)
-
+# constants
+from reflax import ONE_LAYER_MODEL, forward_model
+from reflax.forward_model.forward_model import batched_forward_model
 from reflax.thickness_modeling.function_sampling import (
     sample_derivative_bound_gp,
-    sample_linear_functions
+    sample_linear_functions,
 )
+from reflax.thickness_modeling.nn_modeling import (
+    RawGrowthNN,
+    predict_growth_rate,
+    predict_thickness,
+    pretrained_initialization,
+    train_nn_model,
+)
+
 
 def analyze_measurement():
 
@@ -66,7 +58,7 @@ def analyze_measurement():
     # ==================== ↓ load measurement ↓ ===================
     # -------------------------------------------------------------
 
-    measurement = np.loadtxt("measurements/reflectance.txt", skiprows = 1)
+    measurement = np.loadtxt("measurements/reflectance.txt", skiprows=1)
     time_raw = jnp.array(measurement[:-100, 0])
 
     # convert the time to hours, numerically ~ nicely between 0 and 1
@@ -88,6 +80,7 @@ def analyze_measurement():
     # -------------------------------------------------------------
 
     from baseline_forward_model_setup import forward_model_params
+
     model = forward_model_params.model
     setup_params = forward_model_params.setup_params
     light_source_params = forward_model_params.light_source_params
@@ -99,11 +92,11 @@ def analyze_measurement():
     polarization_state = forward_model_params.polarization_state
     normalization = forward_model_params.normalization
 
-    # the polar angle is different between the simulation 
-    # and the measurement test, this happened by accident 
+    # the polar angle is different between the simulation
+    # and the measurement test, this happened by accident
     # but should not influence the results
-    setup_params = setup_params._replace(polar_angle = jnp.deg2rad(25))
-    forward_model_params = forward_model_params._replace(setup_params = setup_params)
+    setup_params = setup_params._replace(polar_angle=jnp.deg2rad(25))
+    forward_model_params = forward_model_params._replace(setup_params=setup_params)
 
     # -------------------------------------------------------------
     # ===================== ↑ Simulator Setup ↑ ===================
@@ -145,10 +138,10 @@ def analyze_measurement():
         variance,
         min_slope,
         max_slope,
-        random_final_values = True,
-        min_final_value = 800.0,
-        max_final_value = 1200.0,
-        convex_samples = True,
+        random_final_values=True,
+        min_final_value=800.0,
+        max_final_value=1200.0,
+        convex_samples=True,
     )
 
     random_keyB = jax.random.PRNGKey(69)
@@ -162,30 +155,34 @@ def analyze_measurement():
         variance,
         min_slope,
         max_slope,
-        random_final_values = True,
-        min_final_value = 800.0,
-        max_final_value = 1200.0,
-        convex_samples = True,
+        random_final_values=True,
+        min_final_value=800.0,
+        max_final_value=1200.0,
+        convex_samples=True,
     )
 
     # concatenate all thicknesses (linear and GP) and derivatives
-    thicknesses = jnp.concatenate((thicknesses_linear, thickness_gpA, thickness_gpB), axis=0)
-    derivatives = jnp.concatenate((derivatives_linear, derivatives_gpA, derivatives_gpB), axis=0)
+    thicknesses = jnp.concatenate(
+        (thicknesses_linear, thickness_gpA, thickness_gpB), axis=0
+    )
+    derivatives = jnp.concatenate(
+        (derivatives_linear, derivatives_gpA, derivatives_gpB), axis=0
+    )
 
     # generate reflectance data
     reflectances = batched_forward_model(
-        model = model,
-        setup_params = setup_params,
-        light_source_params = light_source_params,
-        incident_medium_params = incident_medium_params,
-        transmission_medium_params = transmission_medium_params,
-        static_layer_params = static_layer_params,
-        variable_layer_params = variable_layer_params,
-        variable_layer_thicknesses = thicknesses,
-        backside_mode = backside_mode,
-        polarization_state = polarization_state,
-        normalization = normalization,
-        computation_batch_size = 100
+        model=model,
+        setup_params=setup_params,
+        light_source_params=light_source_params,
+        incident_medium_params=incident_medium_params,
+        transmission_medium_params=transmission_medium_params,
+        static_layer_params=static_layer_params,
+        variable_layer_params=variable_layer_params,
+        variable_layer_thicknesses=thicknesses,
+        backside_mode=backside_mode,
+        polarization_state=polarization_state,
+        normalization=normalization,
+        computation_batch_size=100,
     )
 
     # print the shapes of the generated data
@@ -197,10 +194,10 @@ def analyze_measurement():
     # save the training data
     jnp.savez(
         train_data_path,
-        thicknesses = thicknesses,
-        derivatives = derivatives,
-        reflectances = reflectances,
-        time_points = time_points_neural_operator,
+        thicknesses=thicknesses,
+        derivatives=derivatives,
+        reflectances=reflectances,
+        time_points=time_points_neural_operator,
     )
 
     # -------------------------------------------------------------
@@ -212,8 +209,7 @@ def analyze_measurement():
     # -------------------------------------------------------------
 
     neural_operator_training(
-        training_data_path = train_data_path,
-        model_save_path = neural_operator_path
+        training_data_path=train_data_path, model_save_path=neural_operator_path
     )
 
     # -------------------------------------------------------------
@@ -225,28 +221,32 @@ def analyze_measurement():
     # -------------------------------------------------------------
 
     # initialize the neural network
-    growth_nn = RawGrowthNN(dmid = 1024, rngs = nnx.Rngs(seed_for_random_initialization))
+    growth_nn = RawGrowthNN(dmid=1024, rngs=nnx.Rngs(seed_for_random_initialization))
 
     training_data = jnp.load(train_data_path)
     initialized_time_points = training_data["time_points"]
     num_points_no = initialized_time_points.shape[0]
     neural_operator = NeuralOperatorMLP(
-        hidden_dims = [512, 512],
-        num_eval_points = num_points_no,
-        rngs = nnx.Rngs(42),
+        hidden_dims=[512, 512],
+        num_eval_points=num_points_no,
+        rngs=nnx.Rngs(42),
     )
     # load the neural operator model
     neural_operator = load_model(
-        filepath = neural_operator_path,
-        abstract_model = neural_operator,
+        filepath=neural_operator_path,
+        abstract_model=neural_operator,
     )
     # downsample the time points to the number of points in the neural operator
-    indices = jnp.linspace(0, time_points_measured.shape[0] - 1, num_points_no).astype(int)
+    indices = jnp.linspace(0, time_points_measured.shape[0] - 1, num_points_no).astype(
+        int
+    )
     initialized_time_points = time_points_measured[indices]
     measured_reflectance_initialized = measured_reflectance[indices]
     initialized_thickness = neural_operator(measured_reflectance_initialized)
     # calculate the derivative from the predicted thickness
-    initialized_growth_rate = jnp.gradient(initialized_thickness, initialized_time_points)
+    initialized_growth_rate = jnp.gradient(
+        initialized_thickness, initialized_time_points
+    )
 
     # initialize the neural network to the neural operator result
     growth_nn = pretrained_initialization(
@@ -263,50 +263,44 @@ def analyze_measurement():
         forward_model_params,
         time_points_measured,
         measured_reflectance,
-        learning_rate = learning_rate,
-        num_epochs = num_epochs,
-        print_interval = print_interval,
-        patience = patience
+        learning_rate=learning_rate,
+        num_epochs=num_epochs,
+        print_interval=print_interval,
+        patience=patience,
     )
 
     # predict the thickness and derivative
-    predicted_thickness = predict_thickness(
-        growth_nn,
-        time_points_measured
-    )
-    predicted_growth_rate = predict_growth_rate(
-        growth_nn,
-        time_points_measured
-    )
+    predicted_thickness = predict_thickness(growth_nn, time_points_measured)
+    predicted_growth_rate = predict_growth_rate(growth_nn, time_points_measured)
 
     # calculate the reflectance of the initialized thickness
     initialized_reflectance = forward_model(
-        model = model,
-        setup_params = setup_params,
-        light_source_params = light_source_params,
-        incident_medium_params = incident_medium_params,
-        transmission_medium_params = transmission_medium_params,
-        static_layer_params = static_layer_params,
-        variable_layer_params = variable_layer_params,
-        variable_layer_thicknesses = initialized_thickness,
-        backside_mode = backside_mode,
-        polarization_state = polarization_state,
-        normalization = normalization
+        model=model,
+        setup_params=setup_params,
+        light_source_params=light_source_params,
+        incident_medium_params=incident_medium_params,
+        transmission_medium_params=transmission_medium_params,
+        static_layer_params=static_layer_params,
+        variable_layer_params=variable_layer_params,
+        variable_layer_thicknesses=initialized_thickness,
+        backside_mode=backside_mode,
+        polarization_state=polarization_state,
+        normalization=normalization,
     )
 
     # calculate the reflectance from the predicted thickness
     predicted_reflectance = forward_model(
-        model = model,
-        setup_params = setup_params,
-        light_source_params = light_source_params,
-        incident_medium_params = incident_medium_params,
-        transmission_medium_params = transmission_medium_params,
-        static_layer_params = static_layer_params,
-        variable_layer_params = variable_layer_params,
-        variable_layer_thicknesses = predicted_thickness,
-        backside_mode = backside_mode,
-        polarization_state = polarization_state,
-        normalization = normalization
+        model=model,
+        setup_params=setup_params,
+        light_source_params=light_source_params,
+        incident_medium_params=incident_medium_params,
+        transmission_medium_params=transmission_medium_params,
+        static_layer_params=static_layer_params,
+        variable_layer_params=variable_layer_params,
+        variable_layer_thicknesses=predicted_thickness,
+        backside_mode=backside_mode,
+        polarization_state=polarization_state,
+        normalization=normalization,
     )
 
     # -------------------------------------------------------------
@@ -316,14 +310,14 @@ def analyze_measurement():
     # save all data needed for plotting into a npz file
     jnp.savez(
         analysis_save_path,
-        time_points_measured = time_points_measured,
-        measured_reflectance = measured_reflectance,
-        initialized_time_points = initialized_time_points,
-        initialized_thickness = initialized_thickness,
-        initialized_growth_rate = initialized_growth_rate,
-        predicted_reflectance = predicted_reflectance,
-        predicted_thickness = predicted_thickness,
-        predicted_growth_rate = predicted_growth_rate,
+        time_points_measured=time_points_measured,
+        measured_reflectance=measured_reflectance,
+        initialized_time_points=initialized_time_points,
+        initialized_thickness=initialized_thickness,
+        initialized_growth_rate=initialized_growth_rate,
+        predicted_reflectance=predicted_reflectance,
+        predicted_thickness=predicted_thickness,
+        predicted_growth_rate=predicted_growth_rate,
     )
 
     # load the data for plotting
@@ -338,14 +332,18 @@ def analyze_measurement():
     predicted_growth_rate = data["predicted_growth_rate"]
 
     # print the rms reflectance error
-    rms_reflectance_error = jnp.sqrt(jnp.mean((predicted_reflectance - measured_reflectance)**2))
+    rms_reflectance_error = jnp.sqrt(
+        jnp.mean((predicted_reflectance - measured_reflectance) ** 2)
+    )
     print(f"RMS reflectance error: {rms_reflectance_error}")
 
     # -------------------------------------------------------------
     # ======================= ↓ plotting ↓ ========================
     # -------------------------------------------------------------
 
-    fig = plt.figure(figsize=(15, 5)) # Adjusted figsize slightly for the new subplot layout
+    fig = plt.figure(
+        figsize=(15, 5)
+    )  # Adjusted figsize slightly for the new subplot layout
 
     # Define the main GridSpec: 3 rows for 3 main blocks of plots
     # Block 1: Reflectance + Error (total height ratio 3, e.g., 2 for Reflectance, 1 for Error)
@@ -362,51 +360,52 @@ def analyze_measurement():
     )
 
     # Create axes based on the nested gridspec structure
-    ax1 = fig.add_subplot(gs_reflectance_error[0]) # Reflectance plot
-    ax_error = fig.add_subplot(gs_reflectance_error[1]) # Absolute error plot
-    ax2 = fig.add_subplot(gs_main[1])                # Thickness plot
-    ax3 = fig.add_subplot(gs_main[2])                # Growth rate plot
-
+    ax1 = fig.add_subplot(gs_reflectance_error[0])  # Reflectance plot
+    ax_error = fig.add_subplot(gs_reflectance_error[1])  # Absolute error plot
+    ax2 = fig.add_subplot(gs_main[1])  # Thickness plot
+    ax3 = fig.add_subplot(gs_main[2])  # Growth rate plot
 
     # plot true reflectance in the first subplot (ax1)
-    ax1.plot(time_points_measured, measured_reflectance, label = "measured reflectance")
-    ax1.plot(time_points_measured, predicted_reflectance, label = "predicted reflectance")
+    ax1.plot(time_points_measured, measured_reflectance, label="measured reflectance")
+    ax1.plot(time_points_measured, predicted_reflectance, label="predicted reflectance")
     ax1.set_ylabel("normalized reflectance")
-    ax1.legend(loc = "lower left")
+    ax1.legend(loc="lower left")
     ax1.set_title("Reflectance")
     # ax1.set_xlabel("time in hours")
 
     # plot absolute error in reflectance in the new subplot (ax_error)
     absolute_error = jnp.abs(measured_reflectance - predicted_reflectance)
-    ax_error.plot(time_points_measured, absolute_error, label="absolute error", color='red')
+    ax_error.plot(
+        time_points_measured, absolute_error, label="absolute error", color="red"
+    )
     ax_error.set_ylabel("abs. error")
     ax_error.legend(loc="upper right")
     ax_error.set_xlabel("time in hours")
 
     # plot thickness sample in the second main subplot (ax2)
-    ax2.plot(time_points_measured, predicted_thickness, label = "predicted thickness")
+    ax2.plot(time_points_measured, predicted_thickness, label="predicted thickness")
     ax2.plot(
         initialized_time_points,
         initialized_thickness,
-        label = "initial guess",
-        linestyle = "--"
+        label="initial guess",
+        linestyle="--",
     )
     ax2.set_ylabel("thickness in nm")
-    ax2.legend(loc = "upper left")
+    ax2.legend(loc="upper left")
     ax2.set_title("Thickness")
     ax2.set_xlabel("time in hours")
 
     # plot derivative in the third main subplot (ax3)
-    ax3.plot(time_points_measured, predicted_growth_rate, label = "predicted growth rate")
+    ax3.plot(time_points_measured, predicted_growth_rate, label="predicted growth rate")
     ax3.plot(
         initialized_time_points,
         initialized_growth_rate,
-        label = "initial prediction",
-        linestyle = "--"
+        label="initial prediction",
+        linestyle="--",
     )
     ax3.set_xlabel("time in hours")
     ax3.set_ylabel("growth rate in nm/h")
-    ax3.legend(loc = "lower right")
+    ax3.legend(loc="lower right")
     ax3.set_title("Growth Rate")
     ax3.set_xlabel("time in hours")
 
