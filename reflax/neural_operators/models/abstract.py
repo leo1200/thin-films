@@ -110,21 +110,14 @@ class AbstractSurrogate(nn.Module):
     def load(
         cls,
         surrogate_name: str,
-        dataset_name: str,
-        training_id: str,
+        n_evals: int,
+        path: str,
         device: str = "cpu",
     ):
         """
         Instantiate, load weights + norm-coeffs, and return a ready-to-use model.
         """
-        import numpy as np
-
         from .registry import get_model_config, get_surrogate
-
-        # infer n_evals from the training split
-        arr = np.load(f"data/{dataset_name}/train.npz")
-        n_evals = arr["reflectances"].shape[1]
-        arr.close()
 
         # build empty model
         SurClass = get_surrogate(surrogate_name)
@@ -132,9 +125,6 @@ class AbstractSurrogate(nn.Module):
         model = SurClass(device=device, n_evals=n_evals, config=cfg)
 
         # load everything
-        path = os.path.join(
-            "trained", training_id, f"{surrogate_name.lower()}_{dataset_name}.pth"
-        )
         ckpt = torch.load(path, map_location=device, weights_only=True)
         model.load_state_dict(ckpt["model_state"])
 

@@ -20,94 +20,71 @@ def set_random_seeds(seed: int, device: str) -> None:
 
 
 def load_dataset(
-    dataset_name: str,
-    base_dir: str = "data",
+    filepath: str,
     splits: Tuple[float, float, float] = (0.8, 0.1, 0.1),
     seed: Optional[int] = None,
     epsilon: float = 1e-6,
 ) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
     """
-    Load all .npz files in data/<dataset_name>, each containing 'reflectances' and 'thicknesses',
-    then split into train/test/val according to `splits` (train_frac, test_frac, val_frac).
-    Splits must each be in [0,1] and sum to 1 within `epsilon`. Zero is allowed (e.g. (0,0,1)).
+    Load a single .npz file containing 'reflectances' and 'thicknesses',
+    then split into train/test/val according to `splits` = (train_frac, test_frac, val_frac).
+    Splits must each be in [0,1] and sum to 1 within `epsilon`. Zero is allowed.
 
     Returns:
         r_train, t_train, r_test, t_test, r_val, t_val
     """
-    # Validate split fractions
+    # Validate splits
     if any(s < 0 or s > 1 for s in splits):
-        raise ValueError(f"Each split fraction must be between 0 and 1. Got {splits}")
+        raise ValueError(f"All split fractions must be between 0 and 1. Got {splits}")
     total = sum(splits)
     if abs(total - 1.0) > epsilon:
         raise ValueError(
             f"Splits must sum to 1 (±{epsilon}). Got {splits} (sum={total:.6f})"
         )
 
-    ds_dir = os.path.join(base_dir, dataset_name)
-    if not os.path.isdir(ds_dir):
-        raise FileNotFoundError(f"Dataset directory not found: {ds_dir}")
+    # Check file
+    if not os.path.isfile(filepath):
+        raise FileNotFoundError(f"No such file: {filepath}")
 
-    # Gather and concatenate data
-    refl_list, thick_list = [], []
-    for fname in sorted(os.listdir(ds_dir)):
-        if not fname.endswith(".npz"):
-            continue
-        data = np.load(os.path.join(ds_dir, fname))
-        refl_list.append(data["reflectances"])
-        thick_list.append(data["thicknesses"])
-    if not refl_list:
-        raise RuntimeError(f"No .npz files found in {ds_dir}")
-
-    all_refl = np.concatenate(refl_list, axis=0)
-    all_thick = np.concatenate(thick_list, axis=0)
+    # Load data arrays
+    data = np.load(filepath)
+    if "reflectances" not in data or "thicknesses" not in data:
+        raise KeyError("File must contain 'reflectances' and 'thicknesses' arrays")
+    all_refl = data["reflectances"]
+    all_thick = data["thicknesses"]
     n = all_refl.shape[0]
+    if all_thick.shape[0] != n:
+        raise ValueError(
+            "Mismatched first dimension between reflectances and thicknesses"
+        )
 
     # Compute counts
     n_train = int(np.floor(splits[0] * n))
     n_test = int(np.floor(splits[1] * n))
-    n_val = n - n_train - n_test  # ensures all samples are used
+    n_val = n - n_train - n_test  # absorb rounding remainder
 
-    # Shuffle once
+    # Shuffle indices
     rng = np.random.RandomState(seed)
     idx = rng.permutation(n)
 
-    # Slice indices (works even if n_train or n_test is zero)
+    # Slice indices
     train_idx = idx[:n_train]
     test_idx = idx[n_train : n_train + n_test]
     val_idx = idx[n_train + n_test :]
 
-    r_train = (
-        all_refl[train_idx]
-        if n_train > 0
-        else np.empty((0,) + all_refl.shape[1:], dtype=all_refl.dtype)
-    )
-    t_train = (
-        all_thick[train_idx]
-        if n_train > 0
-        else np.empty((0,) + all_thick.shape[1:], dtype=all_thick.dtype)
-    )
+    # Helper to build empty arrays of correct shape
+    def _slice(arr, indices, count):
+        if count > 0:
+            return arr[indices]
+        # create empty of shape (0, feature_dims...)
+        return np.empty((0,) + arr.shape[1:], dtype=arr.dtype)
 
-    r_test = (
-        all_refl[test_idx]
-        if n_test > 0
-        else np.empty((0,) + all_refl.shape[1:], dtype=all_refl.dtype)
-    )
-    t_test = (
-        all_thick[test_idx]
-        if n_test > 0
-        else np.empty((0,) + all_thick.shape[1:], dtype=all_thick.dtype)
-    )
-
-    r_val = (
-        all_refl[val_idx]
-        if n_val > 0
-        else np.empty((0,) + all_refl.shape[1:], dtype=all_refl.dtype)
-    )
-    t_val = (
-        all_thick[val_idx]
-        if n_val > 0
-        else np.empty((0,) + all_thick.shape[1:], dtype=all_thick.dtype)
-    )
+    r_train = _slice(all_refl, train_idx, n_train)
+    t_train = _slice(all_thick, train_idx, n_train)
+    r_test = _slice(all_refl, test_idx, n_test)
+    t_test = _slice(all_thick, test_idx, n_test)
+    r_val = _slice(all_refl, val_idx, n_val)
+    t_val = _slice(all_thick, val_idx, n_val)
 
     return r_train, t_train, r_test, t_test, r_val, t_val
 
