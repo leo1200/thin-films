@@ -6,8 +6,8 @@ Main reproduction script.
 # from autocvd import autocvd
 # autocvd(num_gpus = 1)
 import os
-
 os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
+# =======================
 
 # = Change dir to paper =
 if os.getcwd() != os.path.dirname(os.path.abspath(__file__)):
@@ -22,9 +22,8 @@ if not os.path.exists("figures"):
 
 # == Configure seaborn ==
 import seaborn as sns
-
-sns.set_theme(style="whitegrid", context="paper", font_scale=1.1)
-
+sns.set_theme(style = "whitegrid", context = "paper", font_scale=1.1)
+# =======================
 
 # from analyze_all_validation_samples import analyze_all_validation_samples
 from analyze_measurement import analyze_measurement
