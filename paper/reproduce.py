@@ -6,18 +6,23 @@ Main reproduction script.
 # from autocvd import autocvd
 # autocvd(num_gpus = 1)
 import os
+
 os.environ["CUDA_VISIBLE_DEVICES"] = "5"
 # =======================
 
+from analyze_all_validation_samples import analyze_all_validation_samples
+from analyze_measurement import analyze_measurement
+from compare_neural_operators import neural_operator_comparison
 from generate_training_data import generate_training_data
 from generate_validation_data import generate_validation_data
+from noise_robustness_test import test_noise_robustness
+from plot_single_analysis_result import plot_single_sample_initialization_comparison
+from plot_validation_analysis_results import (
+    loss_analysis_plot,
+    plot_validation_loss_curves,
+)
 from plot_validation_and_train_data import plot_validation_and_train_data
 from train_neural_operator import neural_operator_training
-from plot_single_analysis_result import plot_single_sample_initialization_comparison
-from analyze_all_validation_samples import analyze_all_validation_samples
-from plot_validation_analysis_results import loss_analysis_plot, plot_validation_loss_curves
-from analyze_measurement import analyze_measurement
-from noise_robustness_test import test_noise_robustness
 
 # generate the training and validation data
 print("===================================================")
@@ -35,7 +40,7 @@ generate_validation_data()
 print("===================================================")
 print("=========== Plotting Train and Val Data ===========")
 print("===================================================")
-plot_validation_and_train_data() # -> Figure 2
+plot_validation_and_train_data()  # -> Figure 2
 
 # train the neural operator
 print("===================================================")
@@ -56,28 +61,40 @@ neural_operator_training()
 print("===================================================")
 print("============ Plotting Single Comparison ===========")
 print("===================================================")
-plot_single_sample_initialization_comparison() # -> Figure 3
+plot_single_sample_initialization_comparison()  # -> Figure 3
 
 # plot validation results as loss kernel density estimates
 print("===================================================")
 print("============== Plotting Analysis KDE ==============")
 print("===================================================")
-loss_analysis_plot() # -> Figure 4
+loss_analysis_plot()  # -> Figure 4
 
 # plot the validation results
 print("===================================================")
 print("============== Plotting Loss Curves ===============")
 print("===================================================")
-plot_validation_loss_curves() # -> Figure 5
+plot_validation_loss_curves()  # -> Figure 5
 
 # test robustness to noise
 print("===================================================")
 print("============ Testing Noise Robustness =============")
 print("===================================================")
-test_noise_robustness() # -> Figure 6
+test_noise_robustness()  # -> Figure 6
 
 # test on experimental data
 print("===================================================")
 print("========== Analyzing Real Lab Measurement =========")
 print("===================================================")
-analyze_measurement() # -> Figure 7
+analyze_measurement()  # -> Figure 7
+
+# test on experimental data
+print("===================================================")
+print("========== Analyzing Real Lab Measurement =========")
+print("===================================================")
+analyze_measurement()  # -> Figure 7
+
+# additional comparison of neural operator performance
+print("===================================================")
+print("====== Comparing Neural Operator Performance ======")
+print("===================================================")
+neural_operator_comparison()  # -> Figure 9
