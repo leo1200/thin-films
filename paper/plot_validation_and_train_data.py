@@ -1,14 +1,15 @@
-from matplotlib import gridspec
-import numpy as np
 import matplotlib.pyplot as plt
+import numpy as np
 import seaborn as sns
+from matplotlib import gridspec
+
 
 def plot_validation_and_train_data(figpath="figures/train_val_data.png"):
     # Load the training data
     data_train = np.load("simulated_data/training_data.npz")
-    thicknesses_train = data_train["thicknesses"]#[100:, :]
-    derivatives_train = data_train["derivatives"]#[100:, :]
-    reflectances_train = data_train["reflectances"]#[100:, :]
+    thicknesses_train = data_train["thicknesses"]  # [100:, :]
+    derivatives_train = data_train["derivatives"]  # [100:, :]
+    reflectances_train = data_train["reflectances"]  # [100:, :]
     time_points_train = data_train["time_points"]
 
     # Load the validation data
@@ -36,8 +37,20 @@ def plot_validation_and_train_data(figpath="figures/train_val_data.png"):
     # Plot reflectance
     ax1.plot(time_points_train, reflectances_train.T, alpha=0.002, color=train_color)
     ax1.plot(time_points_val, reflectances_val.T, alpha=0.03, color=val_color)
-    ax1.plot(time_points_train, reflectances_train[example_index_train], alpha=1.0, label="training data", color=train_color)
-    ax1.plot(time_points_val, reflectances_val[example_index_val], alpha=1.0, label="validation data", color=val_color)
+    ax1.plot(
+        time_points_train,
+        reflectances_train[example_index_train],
+        alpha=1.0,
+        label="training data",
+        color=train_color,
+    )
+    ax1.plot(
+        time_points_val,
+        reflectances_val[example_index_val],
+        alpha=1.0,
+        label="validation data",
+        color=val_color,
+    )
     ax1.legend(loc="upper right")
     ax1.set_title("reflectance")
     ax1.set_ylabel("normalized reflectance")
@@ -45,8 +58,20 @@ def plot_validation_and_train_data(figpath="figures/train_val_data.png"):
     # Plot thickness
     ax2.plot(time_points_train, thicknesses_train.T, alpha=0.002, color=train_color)
     ax2.plot(time_points_val, thicknesses_val.T, alpha=0.03, color=val_color)
-    ax2.plot(time_points_train, thicknesses_train[example_index_train], alpha=1.0, label="training data", color=train_color)
-    ax2.plot(time_points_val, thicknesses_val[example_index_val], alpha=1.0, label="validation data", color=val_color)
+    ax2.plot(
+        time_points_train,
+        thicknesses_train[example_index_train],
+        alpha=1.0,
+        label="training data",
+        color=train_color,
+    )
+    ax2.plot(
+        time_points_val,
+        thicknesses_val[example_index_val],
+        alpha=1.0,
+        label="validation data",
+        color=val_color,
+    )
     ax2.legend(loc="lower right")
     ax2.set_title("thicknesses")
     ax2.set_ylabel("thickness in nm")
@@ -54,8 +79,20 @@ def plot_validation_and_train_data(figpath="figures/train_val_data.png"):
     # Plot first derivative
     ax3.plot(time_points_train, derivatives_train.T, alpha=0.002, color=train_color)
     ax3.plot(time_points_val, derivatives_val.T, alpha=0.03, color=val_color)
-    ax3.plot(time_points_train, derivatives_train[example_index_train], alpha=1.0, label="training data", color=train_color)
-    ax3.plot(time_points_val, derivatives_val[example_index_val], alpha=1.0, label="validation data", color=val_color)
+    ax3.plot(
+        time_points_train,
+        derivatives_train[example_index_train],
+        alpha=1.0,
+        label="training data",
+        color=train_color,
+    )
+    ax3.plot(
+        time_points_val,
+        derivatives_val[example_index_val],
+        alpha=1.0,
+        label="validation data",
+        color=val_color,
+    )
     ax3.legend(loc="lower right")
     ax3.set_title("growth rate")
     ax3.set_xlabel("time in hours")
@@ -75,7 +112,7 @@ def plot_validation_and_train_data(figpath="figures/train_val_data.png"):
         color=train_color,
         fill=True,
         alpha=0.4,
-        linewidth=1
+        linewidth=1,
     )
     sns.kdeplot(
         np.std(derivatives_val, axis=1),
@@ -84,7 +121,7 @@ def plot_validation_and_train_data(figpath="figures/train_val_data.png"):
         color=val_color,
         fill=True,
         alpha=0.4,
-        linewidth=1
+        linewidth=1,
     )
     ax4.set_title("KDE of std(growth rates)")
     ax4.set_xlabel("growth rate std in nm/h")
@@ -102,7 +139,7 @@ def plot_validation_and_train_data(figpath="figures/train_val_data.png"):
         color=train_color,
         fill=True,
         alpha=0.4,
-        linewidth=1
+        linewidth=1,
     )
     sns.kdeplot(
         np.std(second_deriv_val, axis=1),
@@ -111,7 +148,7 @@ def plot_validation_and_train_data(figpath="figures/train_val_data.png"):
         color=val_color,
         fill=True,
         alpha=0.4,
-        linewidth=1
+        linewidth=1,
     )
 
     ax5.set_title("KDE of std(growth acceleration)")
@@ -121,7 +158,7 @@ def plot_validation_and_train_data(figpath="figures/train_val_data.png"):
     # ax5.set_ylim(0, 0.0005)
     ax5.set_xlabel("acceleration std in nm/h²")
     ax5.set_ylabel("density")
-    ax5.legend(loc = "upper right")
+    ax5.legend(loc="upper right")
 
     # fig.subplots_adjust(left=0.08, right=0.97, top=0.95, bottom=0.08, hspace=0.6, wspace=0.35)
     plt.tight_layout()
