@@ -91,16 +91,17 @@ def load_dataset(
 
 def train_and_save_model(
     surrogate_name: str,
-    dataset_name: str,
+    dataset_path: str,
     epochs: int,
     batch_size: int,
     seed: int | None = None,
     device: str = "cpu",
-    training_id: str | None = None,
 ):
     # setup and data loading
     set_random_seeds(seed, device)
-    train_in, train_out, test_in, test_out, val_in, val_out = load_dataset(dataset_name)
+    train_in, train_out, test_in, test_out, val_in, val_out = load_dataset(
+        dataset_path, splits=(0.8, 0.2, 0.0)
+    )
 
     # model instantiation and normalization
     Surrogate = get_surrogate(surrogate_name)
@@ -127,10 +128,7 @@ def train_and_save_model(
     model.fit(train_loader=train_loader, test_loader=test_loader, epochs=epochs)
 
     # saving
-    model_name = f"{surrogate_name.lower()}_{dataset_name}".replace("__", "_")
-    save_id = training_id or dataset_name
     model.save(
-        model_name=model_name,
-        training_id=save_id,
-        base_dir=os.path.join(os.getcwd(), "trained"),
+        model_name=surrogate_name,
+        save_dir="neural_operator_models",
     )

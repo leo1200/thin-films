@@ -79,12 +79,11 @@ class AbstractSurrogate(nn.Module):
         else:
             return _denorm(data)
 
-    def save(self, model_name: str, training_id: str, base_dir: str):
+    def save(self, model_name: str, save_dir) -> None:
         """
         Save model weights + normalization coeffs to:
             <base_dir>/<training_id>/<model_name>.pth
         """
-        save_dir = os.path.join(base_dir, training_id)
         os.makedirs(save_dir, exist_ok=True)
         path = os.path.join(save_dir, f"{model_name}.pth")
 

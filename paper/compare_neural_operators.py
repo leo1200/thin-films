@@ -4,7 +4,7 @@ import torch
 from plot_neural_operator_comparison import plot_combined_loss_and_mse_kde
 
 from reflax.neural_operators.models import AbstractSurrogate
-from reflax.neural_operators.training import load_dataset
+from reflax.neural_operators.training import load_dataset, train_and_save_model
 
 CFG = {
     "archs": [
@@ -14,6 +14,8 @@ CFG = {
         "operator_fcnn",
     ],
     "batch_sizes": [256, 256, 16384, 16384],
+    "epochs": [2000, 2000, 2000, 2000],
+    "seed": 42,
 }
 
 
@@ -21,6 +23,28 @@ def neural_operator_comparison():
     device = "cuda" if torch.cuda.is_available() else "cpu"
     archs = CFG["archs"]
     batches = CFG["batch_sizes"]
+    epochs = CFG["epochs"]
+    seed = CFG["seed"]
+
+    if not (len(archs) == len(epochs) == len(batches)):
+        raise ValueError(
+            "architectures, epochs, and batch_sizes must have the same length"
+        )
+
+    # Make models dir
+    if not os.path.exists("neural_operator_models"):
+        os.makedirs("neural_operator_models")
+
+    for name, ep, bs in zip(archs, epochs, batches):
+        print(f"\n→ Training {name}: epochs={ep}, batch_size={bs}")
+        train_and_save_model(
+            surrogate_name=name,
+            dataset_path="simulated_data/training_data.npz",
+            epochs=ep,
+            batch_size=bs,
+            seed=seed,
+            device=device,
+        )
 
     # We use the full validation set for evaluation
     _, _, _, _, val_in, val_out = load_dataset(

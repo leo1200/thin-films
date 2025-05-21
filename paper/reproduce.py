@@ -20,6 +20,12 @@ if not os.path.exists("figures"):
     os.makedirs("figures")
 # =======================
 
+# == Configure seaborn ==
+import seaborn as sns
+
+sns.set_theme(style="whitegrid", context="paper", font_scale=1.1)
+
+
 # from analyze_all_validation_samples import analyze_all_validation_samples
 from analyze_measurement import analyze_measurement
 from compare_neural_operators import neural_operator_comparison
@@ -90,12 +96,6 @@ print("===================================================")
 print("============ Testing Noise Robustness =============")
 print("===================================================")
 test_noise_robustness()  # -> Figure 6
-
-# test on experimental data
-print("===================================================")
-print("========== Analyzing Real Lab Measurement =========")
-print("===================================================")
-analyze_measurement()  # -> Figure 7
 
 # test on experimental data
 print("===================================================")
