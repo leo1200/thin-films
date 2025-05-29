@@ -10,7 +10,7 @@ packages = [{include = "reflax"}]
 python = ">=3.10"
 jax = ">=0.4.0"
 jaxtyping = ">=0.2.0"
-torch = ">=1.0.0"
+torch = ">=2.0.0"
 schedulefree = ">= 1.4"
 tqdm = ">=4.67.0"
 optuna = ">=4.0.0"
